@@ -3,25 +3,24 @@ package br.com.stringtracker.service;
 import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-/**
- * Explicit claim projection from the access token.
- * <p>
- * Identity resolution order (AD-006): JWT {@code sub} → claim {@code sub} → JWT name →
- * {@link SecurityIdentity} principal (last resort for {@code @TestSecurity} where JsonWebToken
- * claims are not always populated). Production Keycloak tokens always carry {@code sub}.
- */
-public record TokenProfile(String keycloakId, String email, String name) {
+public record TokenProfile(String keycloakId, String email, String name, boolean premium) {
 
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_NAME = "name";
     private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
+    private static final String ROLE_PREMIUM = "premium";
 
     public static TokenProfile from(JsonWebToken jwt, SecurityIdentity identity) {
         String keycloakId = resolveSubject(jwt, identity);
         if (keycloakId == null || keycloakId.isBlank()) {
             throw new IllegalArgumentException("JWT subject (sub) is required");
         }
-        return new TokenProfile(keycloakId, resolveEmail(jwt, keycloakId), resolveName(jwt, keycloakId));
+        return new TokenProfile(
+                keycloakId,
+                resolveEmail(jwt, keycloakId),
+                resolveName(jwt, keycloakId),
+                identity.hasRole(ROLE_PREMIUM)
+        );
     }
 
     private static String resolveSubject(JsonWebToken jwt, SecurityIdentity identity) {

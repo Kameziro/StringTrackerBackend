@@ -108,6 +108,38 @@ Registra treino/jogo e acumula horas na raquete.
 
 - PUT/DELETE raquetes
 - GET sessions
-- Signup/login endpoints na API (Keycloak)
 - Campo `maxHours` persistido
 - Webhooks de pagamento / IAP
+
+---
+
+## Auth BFF (amend 2026-07-12 — AD-012)
+
+Mobile **não** chama Keycloak. Login via API:
+
+### POST `/api/auth/login`
+
+**Auth:** público (sem Bearer)
+
+**Request**
+
+```json
+{
+  "username": "free.player",
+  "password": "free123"
+}
+```
+
+**Response 200**
+
+```json
+{
+  "accessToken": "<jwt>",
+  "tokenType": "Bearer",
+  "expiresIn": 300
+}
+```
+
+**Errors:** `400` validação, `401` credenciais inválidas
+
+Demais `/api/*` continuam com `Authorization: Bearer <accessToken>` (JWT emitido pelo IdP; Quarkus valida via OIDC).

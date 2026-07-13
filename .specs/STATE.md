@@ -24,7 +24,7 @@
 - **Trade-off**: Dados resetam ao reiniciar o app.
 - **Scope**: Features de raquetes, treinos, Home
 - **Date**: 2026-07-12
-- **Status**: active
+- **Status**: superseded by AD-011
 
 ### AD-004
 - **Decision**: Backend canônico é Quarkus 3.x em `backend/` + PostgreSQL; auth via Keycloak (JWT). Não usar Supabase.
@@ -74,14 +74,45 @@
 - **Date**: 2026-07-12
 - **Status**: active
 
+### AD-010
+- **Decision**: Schema do PostgreSQL via Quarkus Flyway; `quarkus.hibernate-orm.database.generation=none` (não usar `update`/`create` em runtime).
+- **Reason**: Pedido explícito do usuário na feature api-mobile-integration; schema versionado e reproduzível.
+- **Trade-off**: Toda mudança de modelo exige migration SQL; onboarding DB limpo depende de `V1__…` correta.
+- **Scope**: `backend/` (substitui AC de ddl `update` do backend-bootstrap em ambientes não-test)
+- **Date**: 2026-07-12
+- **Status**: active
+
+### AD-011
+- **Decision**: Fonte de verdade de raquetes/treinos no mobile é a API Quarkus (`mobile/services` + hooks); store/seed em memória removido.
+- **Reason**: Spec api-mobile-integration (2A) + X-03 AGENT_BRIDGE.
+- **Trade-off**: App requer API+Keycloak up para dados; sem offline.
+- **Scope**: `mobile/hooks`, `mobile/services`, telas Home/Raquetes
+- **Date**: 2026-07-12
+- **Status**: active
+
+### AD-012
+- **Decision**: Mobile NÃO fala com Keycloak. Auth via BFF: `POST /api/auth/login` no Quarkus (service troca username/password por token no IdP); app só usa `EXPO_PUBLIC_API_URL` + Bearer.
+- **Reason**: Pedido do usuário — Keycloak/OIDC no Expo é complexidade desnecessária; backend concentra identidade.
+- **Trade-off**: Backend precisa de password-grant (ou equivalente) ao IdP; client público Expo deixa de ser usado pelo app.
+- **Scope**: `backend` auth resource/service; `mobile/services/auth`, login UI; supersede AMI auth 1A (AuthSession)
+- **Date**: 2026-07-12
+- **Status**: active
+
+### AD-013
+- **Decision**: Todas as entidades JPA estendem `BaseEntity` (`id`, `active`, `registration_date`, `update_date`, `exclusion_date`) com soft-delete via `markExcluded()`.
+- **Reason**: Pedido explícito do usuário para model base compartilhada.
+- **Trade-off**: Listagens/contagens filtram `active = true`; exclusão física fica fora do padrão.
+- **Scope**: `backend/.../model`, repositórios, Flyway `V2__…`
+- **Date**: 2026-07-12
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: monorepo layout (mobile/ + backend/)
-- **Phase / Task**: Move Expo → `mobile/` concluído
-- **Completed**: git mv mobile; README/AGENTS/AD-009
-- **In-progress**: none
-- **Next step (FE)**: `cd mobile && npx expo start`; plugar API quando BE up
-- **Next step (BE)**: continuar em `backend/` (outro agente); WIP backend não incluído neste commit de layout
+- **Feature**: api-mobile-integration (auth BFF amend AD-012)
+- **Phase / Task**: Implementando POST /api/auth/login + login form mobile
+- **Completed**: AMI vertical slice anterior (Verifier PASS)
+- **In-progress**: remover AuthSession / KEYCLOAK_* do mobile
+- **Next step**: BE AuthResource + FE form
 - **Blockers**: none
-- **Uncommitted files**: WIP `backend/**` do outro agente; tooling `.agents`/`.cursor`
+- **Uncommitted files**: WIP backend unrelated
 - **Branch**: master

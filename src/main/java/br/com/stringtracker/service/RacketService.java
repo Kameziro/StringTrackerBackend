@@ -29,7 +29,6 @@ public class RacketService {
 
     @Transactional
     public RacketResponse create(User user, CreateRacketRequest request) {
-        // Serialize freemium check + insert for the same user
         User locked = userRepository.lockById(user.getId());
         FreemiumPolicy.assertCanCreateRacket(locked, racketRepository.countByUser(locked));
 

@@ -2,9 +2,6 @@ package br.com.stringtracker.service;
 
 import br.com.stringtracker.model.User;
 
-/**
- * Product freemium rules. HTTP mapping of the limit message lives in the exception mapper.
- */
 public final class FreemiumPolicy {
 
     public static final String FREE_TIER_LIMIT_MESSAGE =

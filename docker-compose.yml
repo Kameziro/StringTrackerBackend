@@ -19,7 +19,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # Opcional: docker compose --profile full up -d
   keycloak:
     profiles: ["full"]
     image: quay.io/keycloak/keycloak:26.0

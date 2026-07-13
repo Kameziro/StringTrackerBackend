@@ -1,30 +1,29 @@
 # StringTracker API (Quarkus)
 
-API Java/Quarkus do rastreador de vida útil de cordas.
-
-**App irmão:** [StringTrackerMobile](https://github.com/Kameziro/StringTrackerMobile)  
-**Contrato FE↔BE:** [`.specs/contracts/api-v1.md`](.specs/contracts/api-v1.md)
+API Java/Quarkus do rastreador de vida útil de cordas. Contrato FE↔BE: [`.specs/contracts/api-v1.md`](../.specs/contracts/api-v1.md).
 
 ## Stack
 
 - Quarkus 3.20 / Java 21
 - REST (`quarkus-rest-jackson`), Hibernate ORM Panache, PostgreSQL
-- Auth: Keycloak via `quarkus-oidc` (Bearer JWT); `quarkus-smallrye-jwt` no classpath (desabilitado em runtime — OIDC valida o token)
+- Auth: Keycloak via `quarkus-oidc` (valida Bearer JWT). Login do app: BFF `POST /api/auth/login` (mobile não fala com Keycloak — AD-012).
 
 ## Configuração (.env)
 
 ```bash
+cd backend
 cp .env.example .env   # se ainda não existir
 # edite secrets: POSTGRES_PASSWORD, OIDC_CLIENT_SECRET, KEYCLOAK_ADMIN_PASSWORD
 ```
 
-O Quarkus carrega `.env` no `quarkus:dev`. O `docker compose` usa as mesmas variáveis para Postgres/Keycloak.
+O Quarkus carrega `backend/.env` no `quarkus:dev`. O `docker compose` usa as mesmas variáveis para Postgres/Keycloak.
 
 ## Subir infra local
 
-**Só PostgreSQL**:
+**Só PostgreSQL** (API em `localhost:5432`):
 
 ```bash
+cd backend
 docker compose up -d postgres
 ```
 
@@ -50,6 +49,7 @@ docker compose --profile full up -d
 Requer JDK 21 + Maven 3.9+:
 
 ```bash
+cd backend
 ./mvnw quarkus:dev
 # ou
 mvn quarkus:dev
@@ -57,7 +57,15 @@ mvn quarkus:dev
 
 Base URL: `http://localhost:8080`
 
-### Obter token (direct grant — só para dev)
+### Login via API (app / curl)
+
+```bash
+curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"free.player\",\"password\":\"free123\"}"
+```
+
+### Obter token direto no Keycloak (só debug)
 
 ```bash
 curl -s -X POST "http://localhost:8180/realms/stringtracker/protocol/openid-connect/token" \

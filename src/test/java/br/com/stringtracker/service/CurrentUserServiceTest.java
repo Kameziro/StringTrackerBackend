@@ -59,4 +59,16 @@ class CurrentUserServiceTest {
         assertEquals(first.getId(), second.getId());
         assertEquals(1, userRepository.count("keycloakId", "kc-jit-2"));
     }
+
+    @Test
+    @TestSecurity(user = "kc-premium-jit", roles = "premium")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "kc-premium-jit"),
+            @Claim(key = "email", value = "prem@example.com"),
+            @Claim(key = "name", value = "Prem")
+    })
+    void requireCurrentUser_syncsPremiumFromTokenRole() {
+        User user = currentUserService.requireCurrentUser();
+        assertTrue(user.isPremium());
+    }
 }

@@ -24,7 +24,7 @@ public class PlaySessionService {
     @Transactional
     public PlaySessionResponse create(User user, CreatePlaySessionRequest request) {
         Racket racket = racketRepository.findOwnedBy(user, request.racketId())
-                .orElseThrow(() -> new NotFoundException("Racket not found"));
+                .orElseThrow(() -> new NotFoundException("Raquete não encontrada."));
 
         PlaySession session = PlaySession.create(racket, request.durationMinutes(), request.datePlayed());
         playSessionRepository.persist(session);

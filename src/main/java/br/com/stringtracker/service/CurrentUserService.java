@@ -31,7 +31,15 @@ public class CurrentUserService {
         }
 
         return userRepository.findByKeycloakId(profile.keycloakId())
+                .map(user -> syncPremium(user, profile))
                 .orElseGet(() -> createFromProfile(profile));
+    }
+
+    private User syncPremium(User user, TokenProfile profile) {
+        if (user.isPremium() != profile.premium()) {
+            user.setPremium(profile.premium());
+        }
+        return user;
     }
 
     private User createFromProfile(TokenProfile profile) {
@@ -39,7 +47,7 @@ public class CurrentUserService {
         user.setKeycloakId(profile.keycloakId());
         user.setEmail(profile.email());
         user.setName(profile.name());
-        user.setPremium(false);
+        user.setPremium(profile.premium());
         userRepository.persist(user);
         return user;
     }

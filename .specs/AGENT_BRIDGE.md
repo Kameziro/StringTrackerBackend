@@ -10,8 +10,8 @@
 
 | Papel | Chat | Feature spec |
 | ----- | ---- | ------------ |
-| **Frontend (Expo)** | [StringTrackerMobile](https://github.com/Kameziro/StringTrackerMobile) | `.specs/features/mvp-shell/` |
-| **Backend (Quarkus)** | [StringTrackerBackend](https://github.com/Kameziro/StringTrackerBackend) | `.specs/features/backend-bootstrap/` |
+| **Frontend (Expo)** | [MVP StringTracker Spec-Driven](f270231a-7239-44fa-97ce-3768f1210dcf) | `.specs/features/mvp-shell/` |
+| **Backend (Quarkus)** | [Backend Quarkus bootstrap](e0a30e14-6759-4580-b573-71c34ac353d7) | `.specs/features/backend-bootstrap/` |
 
 ---
 
@@ -98,5 +98,5 @@ Contrato **confirmado**. Source of truth: `.specs/contracts/api-v1.md` (status �
 | -- | ---- | ----- | ------ |
 | X-01 | Congelar DTOs em `api-v1.md` | Backend confirma / ambos | **done** (confirmed 2026-07-12) |
 | X-02 | Keycloak realm + client Expo + client API | Backend | **done** (`backend/keycloak/realm-stringtracker.json`) |
-| X-03 | Trocar mock `useRackets` por `/services/api` | Frontend (feature futura) | unblocked (X-01 done) |
+| X-03 | Trocar mock `useRackets` por `/services/api` | Frontend | **done** (api-mobile-integration) |
 | X-04 | Remover menções Supabase das specs FE | Frontend | **done** |

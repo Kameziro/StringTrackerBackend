@@ -1,14 +1,10 @@
 package br.com.stringtracker.resource;
 
-import br.com.stringtracker.model.User;
-import br.com.stringtracker.repository.UserRepository;
-import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.quarkus.test.security.jwt.Claim;
 import io.quarkus.test.security.jwt.JwtSecurity;
 import io.restassured.http.ContentType;
-import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
@@ -27,9 +23,6 @@ class RacketResourceTest {
               "dateStrung": "2026-06-01"
             }
             """;
-
-    @Inject
-    UserRepository userRepository;
 
     @Test
     @TestSecurity(user = "kc-free-list")
@@ -95,15 +88,13 @@ class RacketResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "kc-premium-multi")
+    @TestSecurity(user = "kc-premium-multi", roles = "premium")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "kc-premium-multi"),
             @Claim(key = "email", value = "premium@example.com"),
             @Claim(key = "name", value = "Premium User")
     })
     void createRacket_premiumUser_canCreateMultiple() {
-        seedPremiumUser("kc-premium-multi", "premium@example.com", "Premium User");
-
         given()
                 .contentType(ContentType.JSON)
                 .body(CREATE_BODY)
@@ -131,20 +122,5 @@ class RacketResourceTest {
                 .when().get("/api/rackets")
                 .then()
                 .statusCode(401);
-    }
-
-    private void seedPremiumUser(String keycloakId, String email, String name) {
-        QuarkusTransaction.requiringNew().run(() -> {
-            User user = userRepository.findByKeycloakId(keycloakId).orElseGet(() -> {
-                User created = new User();
-                created.setKeycloakId(keycloakId);
-                created.setEmail(email);
-                created.setName(name);
-                created.setPremium(true);
-                userRepository.persist(created);
-                return created;
-            });
-            user.setPremium(true);
-        });
     }
 }

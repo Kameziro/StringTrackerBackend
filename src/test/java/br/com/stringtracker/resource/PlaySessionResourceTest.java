@@ -96,7 +96,8 @@ class PlaySessionResourceTest {
                         """)
                 .when().post("/api/sessions")
                 .then()
-                .statusCode(404);
+                .statusCode(404)
+                .body(equalTo("Raquete não encontrada."));
     }
 
     @Test
@@ -120,7 +121,8 @@ class PlaySessionResourceTest {
                         """.formatted(foreignRacketId))
                 .when().post("/api/sessions")
                 .then()
-                .statusCode(404);
+                .statusCode(404)
+                .body(equalTo("Raquete não encontrada."));
     }
 
     @Test
