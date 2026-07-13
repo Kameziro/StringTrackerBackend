@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stringtracker-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - stringtracker_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Opcional: docker compose --profile full up -d
+  keycloak:
+    profiles: ["full"]
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: stringtracker-keycloak
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["start-dev", "--import-realm", "--http-port=8180"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./keycloak/realm-stringtracker.json:/opt/keycloak/data/import/realm-stringtracker.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  stringtracker_pg:

@@ -1,0 +1,83 @@
+{
+  "realm": "stringtracker",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "user", "description": "Default user" },
+      { "name": "premium", "description": "Premium subscriber (future sync)" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "stringtracker-api",
+      "name": "StringTracker API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "stringtracker-api-secret",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "stringtracker-expo",
+      "name": "StringTracker Expo",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "*",
+        "exp://*",
+        "http://localhost:*"
+      ],
+      "webOrigins": ["*"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "free.player",
+      "enabled": true,
+      "email": "free@stringtracker.local",
+      "emailVerified": true,
+      "firstName": "Free",
+      "lastName": "Player",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "free123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "premium.player",
+      "enabled": true,
+      "email": "premium@stringtracker.local",
+      "emailVerified": true,
+      "firstName": "Premium",
+      "lastName": "Player",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "premium123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user", "premium"]
+    }
+  ]
+}
