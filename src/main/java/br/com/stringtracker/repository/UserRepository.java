@@ -3,8 +3,8 @@ package br.com.stringtracker.repository;
 import br.com.stringtracker.model.User;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.persistence.LockModeType;
 
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -14,7 +14,15 @@ public class UserRepository implements PanacheRepository<User> {
         return find("keycloakId", keycloakId).firstResultOptional();
     }
 
-    public User lockById(Long id) {
-        return getEntityManager().find(User.class, id, LockModeType.PESSIMISTIC_WRITE);
+    public List<User> findAvailableTodayByCategoryAndCity(int category, Long cityId) {
+        return list(
+                "category = ?1 and availableToday = true and city.id = ?2 ORDER BY name ASC",
+                category,
+                cityId
+        );
+    }
+
+    public List<User> findByCategoryAndCity(int category, Long cityId) {
+        return list("category = ?1 and city.id = ?2", category, cityId);
     }
 }

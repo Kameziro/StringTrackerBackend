@@ -3,12 +3,11 @@ package br.com.stringtracker.service;
 import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-public record TokenProfile(String keycloakId, String email, String name, boolean premium) {
+public record TokenProfile(String keycloakId, String email, String name) {
 
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_NAME = "name";
     private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
-    private static final String ROLE_PREMIUM = "premium";
 
     public static TokenProfile from(JsonWebToken jwt, SecurityIdentity identity) {
         String keycloakId = resolveSubject(jwt, identity);
@@ -18,8 +17,7 @@ public record TokenProfile(String keycloakId, String email, String name, boolean
         return new TokenProfile(
                 keycloakId,
                 resolveEmail(jwt, keycloakId),
-                resolveName(jwt, keycloakId),
-                identity.hasRole(ROLE_PREMIUM)
+                resolveName(jwt, keycloakId)
         );
     }
 

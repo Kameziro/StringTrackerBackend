@@ -2,11 +2,16 @@ package br.com.stringtracker.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
@@ -27,6 +32,17 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String email;
 
-    @Column(name = "is_premium", nullable = false)
-    private boolean premium;
+    /** Categoria de padel (1–8). Null até o jogador completar o perfil. */
+    @Column
+    private Integer category;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "city_id")
+    private City city;
+
+    @Column(name = "available_today", nullable = false)
+    private boolean availableToday;
+
+    @Column(name = "available_today_at")
+    private Instant availableTodayAt;
 }
