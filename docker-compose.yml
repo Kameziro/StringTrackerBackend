@@ -19,6 +19,49 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: stringtracker-minio
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - stringtracker_minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # Cria o bucket de fotos de perfil na primeira subida
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: stringtracker-minio-init
+    env_file:
+      - .env
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      echo 'Aguardando MinIO…';
+      until mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\"; do
+        sleep 1;
+      done;
+      mc mb --ignore-existing local/$$MINIO_BUCKET_AVATARS;
+      mc anonymous set download local/$$MINIO_BUCKET_AVATARS;
+      echo \"Bucket $$MINIO_BUCKET_AVATARS pronto.\";
+      "
+
   keycloak:
     profiles: ["full"]
     image: quay.io/keycloak/keycloak:26.0
@@ -40,3 +83,4 @@ services:
 
 volumes:
   stringtracker_pg:
+  stringtracker_minio:

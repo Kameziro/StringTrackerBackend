@@ -12,10 +12,20 @@ API do app de matching de jogos de padel. Contrato: [`.specs/contracts/api-v1.md
 ## Subir infra
 
 ```bash
-docker compose up -d postgres
-# ou stack completa:
+# Postgres + MinIO (bucket padelmatch-avatars para fotos de perfil)
+docker compose up -d postgres minio minio-init
+
+# ou stack completa (inclui Keycloak):
 docker compose --profile full up -d
 ```
+
+| Serviço | URL |
+|---------|-----|
+| API | `http://localhost:8080` |
+| MinIO S3 API | `http://localhost:9000` |
+| MinIO Console | `http://localhost:9001` |
+
+Credenciais MinIO: `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` no `.env`.
 
 ```bash
 mvn quarkus:dev
