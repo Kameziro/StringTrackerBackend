@@ -41,7 +41,7 @@ class OpenGameResourceTest {
     void createGame_categoryWide_and_groupScoped() {
         given()
                 .contentType(ContentType.JSON)
-                .body(new UpdateProfileRequest("Organizador", 5, false))
+                .body(new UpdateProfileRequest("Organizador", 5, 5565L, false))
                 .when().put("/api/me/profile")
                 .then().statusCode(200);
 

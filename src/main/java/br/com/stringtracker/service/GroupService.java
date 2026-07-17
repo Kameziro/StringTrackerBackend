@@ -49,7 +49,7 @@ public class GroupService {
 
     @Transactional
     public GroupResponse create(User user, CreateGroupRequest request) {
-        String name = request.name().trim();
+        String name = request.getName().trim();
         if (playerGroupRepository.findByNameIgnoreCase(name).isPresent()) {
             throw new BadRequestException("Já existe um grupo com esse nome");
         }

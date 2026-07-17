@@ -22,10 +22,21 @@ public interface KeycloakTokenClient {
             @RestForm("password") String password
     );
 
+    @POST
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    TokenResponse refreshGrant(
+            @RestForm("grant_type") String grantType,
+            @RestForm("client_id") String clientId,
+            @RestForm("refresh_token") String refreshToken
+    );
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     record TokenResponse(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("expires_in") long expiresIn,
+            @JsonProperty("refresh_token") String refreshToken,
+            @JsonProperty("refresh_expires_in") long refreshExpiresIn,
             @JsonProperty("token_type") String tokenType
     ) {
     }

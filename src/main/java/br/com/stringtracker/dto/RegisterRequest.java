@@ -1,5 +1,6 @@
 package br.com.stringtracker.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -9,32 +10,28 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateOpenGameRequest {
+public class RegisterRequest {
 
     @NotBlank
-    @Size(max = 120)
-    private String place;
+    @Email
+    private String email;
 
-    @NotNull
-    private Instant startsAt;
+    @NotBlank
+    @Size(min = 6, max = 128)
+    private String password;
 
-    @NotNull
-    private Instant endsAt;
+    @NotBlank
+    @Size(min = 2, max = 120)
+    private String name;
 
     @NotNull
     @Min(1)
     @Max(8)
     private Integer category;
 
-    @Min(2)
-    @Max(8)
-    private Integer capacity;
-
-    /** Null = notifica toda a categoria; preenchido = só membros do grupo. */
-    private Long groupId;
+    @NotNull
+    private Long cityId;
 }

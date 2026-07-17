@@ -4,7 +4,7 @@ import br.com.stringtracker.dto.CityResponse;
 import br.com.stringtracker.dto.StateResponse;
 import br.com.stringtracker.repository.CityRepository;
 import br.com.stringtracker.repository.StateRepository;
-import io.quarkus.security.Authenticated;
+import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
@@ -16,7 +16,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 
 @Path("/api/geo")
-@Authenticated
+@PermitAll
 @Produces(MediaType.APPLICATION_JSON)
 public class GeoResource {
 

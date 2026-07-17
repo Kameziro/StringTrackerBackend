@@ -4,31 +4,42 @@ import br.com.stringtracker.model.GameInterest;
 import br.com.stringtracker.model.GameInterestStatus;
 import br.com.stringtracker.model.OpenGame;
 import br.com.stringtracker.model.OpenGameStatus;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.List;
 
-public record OpenGameResponse(
-        Long id,
-        Long organizerId,
-        String organizerName,
-        Long clubId,
-        String clubName,
-        Long groupId,
-        String groupName,
-        Instant startsAt,
-        Instant endsAt,
-        int category,
-        int capacity,
-        OpenGameStatus status,
-        int interestedCount,
-        List<InterestResponse> interests
-) {
-    public record InterestResponse(
-            Long userId,
-            String userName,
-            GameInterestStatus status
-    ) {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OpenGameResponse {
+
+    private Long id;
+    private Long organizerId;
+    private String organizerName;
+    private Long clubId;
+    private String clubName;
+    private Long groupId;
+    private String groupName;
+    private Instant startsAt;
+    private Instant endsAt;
+    private int category;
+    private int capacity;
+    private OpenGameStatus status;
+    private int interestedCount;
+    private List<InterestResponse> interests;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class InterestResponse {
+
+        private Long userId;
+        private String userName;
+        private GameInterestStatus status;
+
         public static InterestResponse from(GameInterest interest) {
             return new InterestResponse(
                     interest.getUser().getId(),

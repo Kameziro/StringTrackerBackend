@@ -14,6 +14,10 @@ public class UserRepository implements PanacheRepository<User> {
         return find("keycloakId", keycloakId).firstResultOptional();
     }
 
+    public Optional<User> findByEmail(String email) {
+        return find("email", email).firstResultOptional();
+    }
+
     public List<User> findAvailableTodayByCategoryAndCity(int category, Long cityId) {
         return list(
                 "category = ?1 and availableToday = true and city.id = ?2 ORDER BY name ASC",

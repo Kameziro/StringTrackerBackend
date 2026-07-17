@@ -2,21 +2,28 @@ package br.com.stringtracker.dto;
 
 import br.com.stringtracker.model.City;
 import br.com.stringtracker.model.User;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-public record ProfileResponse(
-        Long id,
-        String name,
-        String email,
-        Integer category,
-        Long cityId,
-        String cityName,
-        Long stateId,
-        String stateUf,
-        boolean availableToday,
-        Instant availableTodayAt
-) {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProfileResponse {
+
+    private Long id;
+    private String name;
+    private String email;
+    private Integer category;
+    private Long cityId;
+    private String cityName;
+    private Long stateId;
+    private String stateUf;
+    private boolean availableToday;
+    private Instant availableTodayAt;
+
     public static ProfileResponse from(User user) {
         City city = user.getCity();
         return new ProfileResponse(

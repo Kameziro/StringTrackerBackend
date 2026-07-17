@@ -46,12 +46,12 @@ public class ProfileService {
     public ProfileResponse updateProfile(User user, UpdateProfileRequest request) {
         User managed = userRepository.findByIdOptional(user.getId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
-        City city = cityRepository.findByIdOptional(request.cityId())
+        City city = cityRepository.findByIdOptional(request.getCityId())
                 .orElseThrow(() -> new NotFoundException("Cidade não encontrada"));
-        managed.setName(request.name().trim());
-        managed.setCategory(request.category());
+        managed.setName(request.getName().trim());
+        managed.setCategory(request.getCategory());
         managed.setCity(city);
-        boolean available = Boolean.TRUE.equals(request.availableToday());
+        boolean available = Boolean.TRUE.equals(request.getAvailableToday());
         managed.setAvailableToday(available);
         managed.setAvailableTodayAt(available ? Instant.now() : null);
         return ProfileResponse.from(managed);
@@ -66,20 +66,20 @@ public class ProfileService {
         User managed = userRepository.findByIdOptional(user.getId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
         availabilitySlotRepository.deleteByUser(managed);
-        for (UpdateAvailabilityRequest.AvailabilitySlotRequest slotReq : request.slots()) {
-            if (!slotReq.endTime().isAfter(slotReq.startTime())) {
+        for (UpdateAvailabilityRequest.AvailabilitySlotRequest slotReq : request.getSlots()) {
+            if (!slotReq.getEndTime().isAfter(slotReq.getStartTime())) {
                 throw new BadRequestException("endTime must be after startTime");
             }
             Club club = null;
-            if (slotReq.clubId() != null) {
-                club = clubRepository.findByIdOptional(slotReq.clubId())
+            if (slotReq.getClubId() != null) {
+                club = clubRepository.findByIdOptional(slotReq.getClubId())
                         .orElseThrow(() -> new NotFoundException("Club not found"));
             }
             AvailabilitySlot slot = AvailabilitySlot.create(
                     managed,
-                    slotReq.dayOfWeek(),
-                    slotReq.startTime(),
-                    slotReq.endTime(),
+                    slotReq.getDayOfWeek(),
+                    slotReq.getStartTime(),
+                    slotReq.getEndTime(),
                     club
             );
             availabilitySlotRepository.persist(slot);
@@ -97,13 +97,13 @@ public class ProfileService {
     public void registerDeviceToken(User user, RegisterDeviceTokenRequest request) {
         User managed = userRepository.findByIdOptional(user.getId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
-        String token = request.expoPushToken().trim();
+        String token = request.getExpoPushToken().trim();
         DeviceToken existing = deviceTokenRepository.findByToken(token).orElse(null);
         if (existing != null) {
             existing.setUser(managed);
-            existing.setPlatform(request.platform().trim());
+            existing.setPlatform(request.getPlatform().trim());
             return;
         }
-        deviceTokenRepository.persist(DeviceToken.create(managed, token, request.platform().trim()));
+        deviceTokenRepository.persist(DeviceToken.create(managed, token, request.getPlatform().trim()));
     }
 }

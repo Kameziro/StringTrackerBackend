@@ -54,20 +54,20 @@ public class OpenGameService {
         if (organizer.getCity() == null) {
             throw new BadRequestException("Informe sua cidade no perfil antes de criar um jogo");
         }
-        if (!request.endsAt().isAfter(request.startsAt())) {
+        if (!request.getEndsAt().isAfter(request.getStartsAt())) {
             throw new BadRequestException("endsAt must be after startsAt");
         }
-        String place = request.place().trim();
+        String place = request.getPlace().trim();
         if (place.isEmpty()) {
             throw new BadRequestException("Informe o lugar do jogo");
         }
         Club club = clubRepository.findOrCreateByName(place);
-        int capacity = request.capacity() != null ? request.capacity() : 4;
-        int category = request.category();
+        int capacity = request.getCapacity() != null ? request.getCapacity() : 4;
+        int category = request.getCategory();
 
         PlayerGroup group = null;
-        if (request.groupId() != null) {
-            group = groupService.requireGroup(request.groupId());
+        if (request.getGroupId() != null) {
+            group = groupService.requireGroup(request.getGroupId());
             if (!groupService.isMember(group, organizer)) {
                 throw new ForbiddenException("Entre no grupo antes de publicar um jogo nele");
             }
@@ -76,8 +76,8 @@ public class OpenGameService {
         OpenGame game = OpenGame.create(
                 organizer,
                 club,
-                request.startsAt(),
-                request.endsAt(),
+                request.getStartsAt(),
+                request.getEndsAt(),
                 category,
                 capacity,
                 group
