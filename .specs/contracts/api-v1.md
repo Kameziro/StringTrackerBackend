@@ -4,8 +4,10 @@ Auth: `POST /api/auth/login` (BFF Keycloak) → Bearer JWT em todas as rotas aba
 
 ## Perfil
 
-- `GET /api/me/profile`
+- `GET /api/me/profile` → `{ id, name, email, category, availableToday, avatarUrl? }`
 - `PUT /api/me/profile` `{ name, category (1–8), availableToday }`
+- `POST /api/me/profile/avatar` multipart `file` (image/jpeg|png|webp, máx. ~5MB) → `avatarUrl` = `/api/media/avatars/users/{id}/avatar.ext?v=…`
+- `GET /api/media/avatars/{objectKey}` — público, proxy do MinIO (mesmo host da API)
 - `GET|PUT /api/me/availability` slots semanais
 - `POST /api/me/device-token` `{ expoPushToken, platform }`
 
@@ -22,6 +24,11 @@ Auth: `POST /api/auth/login` (BFF Keycloak) → Bearer JWT em todas as rotas aba
 - `POST /api/groups` `{ name }` — cria e entra
 - `POST /api/groups/{id}/join`
 - `POST /api/groups/{id}/leave`
+- `POST /api/groups/{id}/avatar` multipart `file` → detalhe com `avatarUrl` (admin/mod)
+- `POST /api/groups/{id}/banner` multipart `file` → detalhe com `bannerUrl` (admin/mod)
+- `PUT /api/groups/{id}/members/{userId}/role` `{ role: ADMIN|MODERATOR|MEMBER }` (admin)
+- `GET /api/media/{objectKey}` — público (`users/...`, `groups/...`)
+- Detalhe do grupo inclui `myRole` e `members[].role`
 
 ## Jogos
 

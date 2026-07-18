@@ -23,6 +23,12 @@ public class PlayerGroup extends BaseEntity {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(name = "avatar_url", length = 512)
+    private String avatarUrl;
+
+    @Column(name = "banner_url", length = 512)
+    private String bannerUrl;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;

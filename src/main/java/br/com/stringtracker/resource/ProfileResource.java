@@ -18,13 +18,14 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
 
 @Path("/api/me")
 @Authenticated
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class ProfileResource {
 
     @Inject
@@ -41,8 +42,16 @@ public class ProfileResource {
 
     @PUT
     @Path("/profile")
+    @Consumes(MediaType.APPLICATION_JSON)
     public ProfileResponse updateProfile(@Valid UpdateProfileRequest request) {
         return profileService.updateProfile(currentUserService.requireCurrentUser(), request);
+    }
+
+    @POST
+    @Path("/profile/avatar")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public ProfileResponse uploadAvatar(@RestForm("file") FileUpload file) {
+        return profileService.uploadAvatar(currentUserService.requireCurrentUser(), file);
     }
 
     @GET
@@ -53,12 +62,14 @@ public class ProfileResource {
 
     @PUT
     @Path("/availability")
+    @Consumes(MediaType.APPLICATION_JSON)
     public List<AvailabilitySlotResponse> updateAvailability(@Valid UpdateAvailabilityRequest request) {
         return profileService.replaceAvailability(currentUserService.requireCurrentUser(), request);
     }
 
     @POST
     @Path("/device-token")
+    @Consumes(MediaType.APPLICATION_JSON)
     public Response registerDeviceToken(@Valid RegisterDeviceTokenRequest request) {
         profileService.registerDeviceToken(currentUserService.requireCurrentUser(), request);
         return Response.noContent().build();

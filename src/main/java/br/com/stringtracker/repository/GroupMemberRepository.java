@@ -16,6 +16,10 @@ public class GroupMemberRepository implements PanacheRepository<GroupMember> {
         return find("group = ?1 and user = ?2", group, user).firstResultOptional();
     }
 
+    public Optional<GroupMember> findByGroupIdAndUserId(Long groupId, Long userId) {
+        return find("group.id = ?1 and user.id = ?2", groupId, userId).firstResultOptional();
+    }
+
     public boolean isMember(PlayerGroup group, User user) {
         return count("group = ?1 and user = ?2", group, user) > 0;
     }

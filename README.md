@@ -27,6 +27,9 @@ docker compose --profile full up -d
 
 Credenciais MinIO: `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` no `.env`.
 
+**Foto de perfil:** `POST /api/me/profile/avatar` (`multipart` campo `file`) grava no bucket e devolve `avatarUrl`.  
+No iPhone físico, defina `MINIO_PUBLIC_BASE_URL=http://<IP-da-sua-rede>:9000` para as imagens abrirem no aparelho.
+
 ```bash
 mvn quarkus:dev
 ```

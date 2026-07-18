@@ -2,6 +2,7 @@ package br.com.stringtracker.dto;
 
 import br.com.stringtracker.model.City;
 import br.com.stringtracker.model.User;
+import br.com.stringtracker.service.MinioObjectStorage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,9 +24,13 @@ public class ProfileResponse {
     private String stateUf;
     private boolean availableToday;
     private Instant availableTodayAt;
+    private String avatarUrl;
 
-    public static ProfileResponse from(User user) {
+    public static ProfileResponse from(User user, MinioObjectStorage storage) {
         City city = user.getCity();
+        String avatar = storage != null
+                ? storage.toClientMediaUrl(user.getAvatarUrl())
+                : user.getAvatarUrl();
         return new ProfileResponse(
                 user.getId(),
                 user.getName(),
@@ -36,7 +41,8 @@ public class ProfileResponse {
                 city != null ? city.getState().getId() : null,
                 city != null ? city.getState().getUf() : null,
                 user.isAvailableToday(),
-                user.getAvailableTodayAt()
+                user.getAvailableTodayAt(),
+                avatar
         );
     }
 }

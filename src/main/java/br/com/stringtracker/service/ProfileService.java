@@ -20,7 +20,11 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 
@@ -42,6 +46,9 @@ public class ProfileService {
     @Inject
     DeviceTokenRepository deviceTokenRepository;
 
+    @Inject
+    MinioObjectStorage minioObjectStorage;
+
     @Transactional
     public ProfileResponse updateProfile(User user, UpdateProfileRequest request) {
         User managed = userRepository.findByIdOptional(user.getId())
@@ -54,11 +61,42 @@ public class ProfileService {
         boolean available = Boolean.TRUE.equals(request.getAvailableToday());
         managed.setAvailableToday(available);
         managed.setAvailableTodayAt(available ? Instant.now() : null);
-        return ProfileResponse.from(managed);
+        return ProfileResponse.from(managed, minioObjectStorage);
     }
 
     public ProfileResponse getProfile(User user) {
-        return ProfileResponse.from(user);
+        return ProfileResponse.from(user, minioObjectStorage);
+    }
+
+    @Transactional
+    public ProfileResponse uploadAvatar(User user, FileUpload file) {
+        if (file == null || file.size() <= 0) {
+            throw new BadRequestException("Envie um arquivo de imagem no campo file");
+        }
+        User managed = userRepository.findByIdOptional(user.getId())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        String previousUrl = managed.getAvatarUrl();
+        String previousKey = minioObjectStorage.extractObjectKey(previousUrl);
+        String contentType = file.contentType();
+        try (InputStream in = Files.newInputStream(file.uploadedFile())) {
+            String publicUrl = minioObjectStorage.uploadUserAvatar(
+                    managed.getId(),
+                    in,
+                    file.size(),
+                    contentType
+            );
+            managed.setAvatarUrl(publicUrl);
+        } catch (IOException e) {
+            throw new BadRequestException("Não foi possível ler a imagem enviada");
+        }
+
+        String newKey = minioObjectStorage.extractObjectKey(managed.getAvatarUrl());
+        // mesmo object key = overwrite no MinIO — não apagar o arquivo novo
+        if (previousKey != null && newKey != null && !previousKey.equals(newKey)) {
+            minioObjectStorage.deleteObjectIfPresent(previousUrl);
+        }
+        return ProfileResponse.from(managed, minioObjectStorage);
     }
 
     @Transactional

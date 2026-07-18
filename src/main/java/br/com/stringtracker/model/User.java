@@ -45,4 +45,8 @@ public class User extends BaseEntity {
 
     @Column(name = "available_today_at")
     private Instant availableTodayAt;
+
+    /** URL pública da foto no MinIO (bucket de avatars). */
+    @Column(name = "avatar_url", length = 512)
+    private String avatarUrl;
 }
