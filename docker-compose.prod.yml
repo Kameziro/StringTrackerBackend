@@ -1,4 +1,5 @@
-# Produção (VPS). Só o Caddy expõe portas; o resto fica na rede interna.
+# Produção (VPS). A API escuta só em 127.0.0.1:8080, atrás do Nginx do host
+# (deploy/nginx/padel.kameziro.com.br.conf); o resto fica na rede interna.
 # docker compose -f docker-compose.prod.yml up -d --build
 name: padelmatch
 
@@ -73,6 +74,8 @@ services:
   api:
     build: .
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -96,33 +99,10 @@ services:
       keycloak:
         condition: service_started
 
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-
 configs:
   keycloak-db:
     content: CREATE DATABASE keycloak;
-  caddyfile:
-    content: |
-      ${DOMAIN} {
-        reverse_proxy api:8080
-      }
 
 volumes:
   pg:
   minio:
-  caddy_data:
-  caddy_config:

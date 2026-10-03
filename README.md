@@ -315,14 +315,17 @@ Perfil `%test`: H2 em memória (`MODE=PostgreSQL`), Flyway limpa e reaplica, OID
 
 ## Deploy (VPS)
 
-`docker-compose.prod.yml` sobe tudo em containers. Só o Caddy expõe portas (80/443) e emite o certificado HTTPS do `DOMAIN` sozinho; Postgres, MinIO e Keycloak ficam na rede interna. O realm de produção (`realm-stringtracker.prod.json`) não tem usuários de teste e lê o secret da API do `.env`.
+`docker-compose.prod.yml` sobe tudo em containers e publica só a API, em `127.0.0.1:8080`; Postgres, MinIO e Keycloak ficam na rede interna. O Nginx do host termina o HTTPS de `padel.kameziro.com.br` e encaminha para a API (`deploy/nginx/`). O realm de produção (`realm-stringtracker.prod.json`) não tem usuários de teste e lê o secret da API do `.env`.
 
-Na VPS (Ubuntu com Docker), com o DNS do `DOMAIN` apontando para ela:
+Na VPS (Ubuntu com Docker, Nginx e certbot), com o DNS apontando para ela:
 
 ```bash
-git clone https://github.com/Kameziro/StringTrackerBackend.git && cd StringTrackerBackend
+git clone https://github.com/Kameziro/StringTrackerBackend.git /opt/padelmatch && cd /opt/padelmatch
 cp .env.prod.example .env   # preencha os secrets: openssl rand -hex 24
 docker compose -f docker-compose.prod.yml up -d --build
+certbot certonly --nginx -d padel.kameziro.com.br
+ln -s /opt/padelmatch/deploy/nginx/padel.kameziro.com.br.conf /etc/nginx/sites-enabled/padel
+nginx -t && systemctl reload nginx
 ```
 
 Atualizar: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
@@ -334,7 +337,8 @@ O console do Keycloak não é exposto. Para usá-lo, publique `127.0.0.1:8180:81
 ```
 .
 ├── docker-compose.yml          # postgres, minio, minio-init, keycloak (profile full)
-├── docker-compose.prod.yml     # produção: + api e caddy (HTTPS), sem portas internas expostas
+├── docker-compose.prod.yml     # produção: + api em 127.0.0.1:8080, sem portas internas expostas
+├── deploy/nginx/               # site do Nginx do host (HTTPS + proxy para a API)
 ├── Dockerfile                  # imagem da API (JVM)
 ├── keycloak/realm-stringtracker.json
 ├── keycloak/realm-stringtracker.prod.json
