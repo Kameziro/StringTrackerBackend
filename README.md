@@ -311,7 +311,7 @@ Seed de clubes (V3) e estados/cidades (V7) entra na primeira subida.
 mvn test
 ```
 
-Perfil `%test`: H2 em memória (`MODE=PostgreSQL`), Flyway limpa e reaplica, OIDC desligado, JWT de teste via `quarkus-test-security-jwt`. Integração nativa (`-Pnative`) está no `pom.xml` mas ITs vêm desligados por padrão (`skipITs`).
+Perfil `%test`: Postgres temporário via Quarkus Dev Services (precisa de Docker), Flyway limpa e reaplica, OIDC desligado, JWT de teste via `quarkus-test-security-jwt`. Integração nativa (`-Pnative`) está no `pom.xml` mas ITs vêm desligados por padrão (`skipITs`).
 
 ## Deploy (VPS)
 
