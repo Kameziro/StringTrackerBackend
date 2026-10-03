@@ -11,7 +11,7 @@ import java.util.Optional;
 public class ClubRepository implements PanacheRepository<Club> {
 
     public List<Club> listAllActive() {
-        return list("ORDER BY name ASC");
+        return list("active = true ORDER BY name ASC");
     }
 
     // O filtro `active` é explícito: @SQLRestriction na BaseEntity (@MappedSuperclass) não é aplicado pelo Hibernate.
