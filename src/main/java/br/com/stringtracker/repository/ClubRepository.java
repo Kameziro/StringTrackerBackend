@@ -14,6 +14,11 @@ public class ClubRepository implements PanacheRepository<Club> {
         return list("ORDER BY name ASC");
     }
 
+    // O filtro `active` é explícito: @SQLRestriction na BaseEntity (@MappedSuperclass) não é aplicado pelo Hibernate.
+    public Optional<Club> findActiveById(long id) {
+        return find("id = ?1 and active = true", id).firstResultOptional();
+    }
+
     public Optional<Club> findByNameIgnoreCase(String name) {
         return find("lower(name) = lower(?1)", name.trim()).firstResultOptional();
     }
