@@ -2,7 +2,10 @@ package br.com.stringtracker.dto;
 
 import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubPaymentStatus;
+import br.com.stringtracker.model.ClubPhoto;
 import br.com.stringtracker.service.MinioObjectStorage;
+
+import java.util.List;
 
 /** Perfil do clube para o admin. Os tokens da conta de recebimento nunca entram aqui. */
 public record ClubProfileResponse(
@@ -13,10 +16,11 @@ public record ClubProfileResponse(
         String address,
         String whatsapp,
         String logoUrl,
-        ClubPaymentStatus paymentStatus
+        ClubPaymentStatus paymentStatus,
+        List<ClubPhotoResponse> photos
 ) {
 
-    public static ClubProfileResponse from(Club club, MinioObjectStorage storage) {
+    public static ClubProfileResponse from(Club club, List<ClubPhoto> photos, MinioObjectStorage storage) {
         var city = club.getCity();
         return new ClubProfileResponse(
                 club.getId(),
@@ -26,6 +30,7 @@ public record ClubProfileResponse(
                 club.getAddress(),
                 club.getWhatsapp(),
                 storage.toClientMediaUrl(club.getLogoUrl()),
-                club.getPaymentStatus());
+                club.getPaymentStatus(),
+                photos.stream().map(photo -> ClubPhotoResponse.from(photo, storage)).toList());
     }
 }

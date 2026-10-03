@@ -15,7 +15,8 @@ import java.util.Locale;
 
 /**
  * Proxy público de mídia (RN Image não envia Authorization).
- * Paths: users/{id}/avatar.*, groups/{id}/avatar.*, groups/{id}/banner.*
+ * Paths: users/{id}/avatar.*, groups/{id}/avatar.*, groups/{id}/banner.*,
+ * clubs/{id}/logo.*, clubs/{id}/photos/{uuid}.*
  */
 @Path("/api/media")
 @PermitAll
@@ -63,7 +64,7 @@ public class MediaResource {
         if (key.contains("..") || key.startsWith("/")) {
             throw new NotFoundException("Arquivo não encontrado");
         }
-        boolean allowedPrefix = key.startsWith("users/") || key.startsWith("groups/");
+        boolean allowedPrefix = key.startsWith("users/") || key.startsWith("groups/") || key.startsWith("clubs/");
         if (!allowedPrefix) {
             throw new NotFoundException("Arquivo não encontrado");
         }

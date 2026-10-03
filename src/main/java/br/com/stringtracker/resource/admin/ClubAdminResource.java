@@ -8,6 +8,7 @@ import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -16,6 +17,8 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 @Path("/api/admin/clubs/{clubId}")
 @Authenticated
@@ -39,6 +42,27 @@ public class ClubAdminResource {
             @Valid UpdateClubProfileRequest request
     ) {
         return clubAdminService.updateProfile(clubId, request);
+    }
+
+    @POST
+    @Path("/logo")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public ClubProfileResponse uploadLogo(@PathParam("clubId") long clubId, @RestForm("file") FileUpload file) {
+        return clubAdminService.uploadLogo(clubId, file);
+    }
+
+    @POST
+    @Path("/photos")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response addPhoto(@PathParam("clubId") long clubId, @RestForm("file") FileUpload file) {
+        return Response.status(Response.Status.CREATED).entity(clubAdminService.addPhoto(clubId, file)).build();
+    }
+
+    @DELETE
+    @Path("/photos/{photoId}")
+    public Response removePhoto(@PathParam("clubId") long clubId, @PathParam("photoId") long photoId) {
+        clubAdminService.removePhoto(clubId, photoId);
+        return Response.noContent().build();
     }
 
     @POST
