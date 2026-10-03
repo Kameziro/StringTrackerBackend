@@ -23,7 +23,7 @@ Decisões de produto: [`.specs/STATE.md`](.specs/STATE.md).
 | HTTP | RESTEasy Reactive + Jackson |
 | Persistência | Hibernate ORM Panache, PostgreSQL 16, Flyway |
 | Auth | Keycloak 26 (`quarkus-oidc`) + BFF password grant |
-| Storage | MinIO (S3-compatível) para avatars/banners |
+| Storage | MinIO (S3-compatível) para avatars/banners, imagens do fork comunitário `pgsty/minio` |
 | Push | Expo Push API (`https://exp.host`) |
 | Testes | JUnit 5, REST Assured, H2 em memória, `quarkus-test-security-jwt` |
 
@@ -332,6 +332,27 @@ nginx -t && systemctl reload nginx
 
 `.github/workflows/ci.yml` roda `mvn verify` em todo push e PR. Em push na `main`, se os testes passam, o job `deploy` entra na VPS como o usuário `deploy` (sem root, no grupo `docker`, dono de `/opt/padelmatch`) com a chave do secret `DEPLOY_SSH_KEY`. Em `~deploy/.ssh/authorized_keys` essa chave tem `command="/opt/padelmatch/deploy/deploy.sh",restrict`: só consegue rodar o script, que avança o checkout para `origin/main` e refaz a stack. Mudanças em `deploy/nginx/` precisam de reload manual do Nginx, como root.
 
+### MinIO: imagens e migração
+
+A MinIO Inc. parou de publicar imagens da edição comunitária em outubro de 2025 e arquivou o `minio/minio`; as tags `minio/minio` e `minio/mc` não baixam mais. Os dois compose usam o fork comunitário [pgsty/minio](https://github.com/pgsty/minio) (`pgsty/minio` e `pgsty/mc` no Docker Hub, AGPLv3, amd64/arm64), que segue recebendo correções de segurança. É substituto direto: mesmas variáveis (`MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`), mesmo `server /data`, mesmo formato em disco e console web de volta. Para atualizar, troque a tag `RELEASE.*` nos dois arquivos ([tags](https://hub.docker.com/r/pgsty/minio/tags), [tags do mc](https://hub.docker.com/r/pgsty/mc/tags)).
+
+A troca de imagem reaproveita o volume `padelmatch_minio` sem copiar objetos: a nova versão lê os dados gravados pela `RELEASE.2025-04-22`. A atualização pode reescrever metadados internos (`.minio.sys`), então faça backup na VPS antes do merge na `main` (o CI faz o deploy sozinho):
+
+```bash
+cd /opt/padelmatch
+docker compose -f docker-compose.prod.yml stop minio
+docker run --rm -v padelmatch_minio:/data:ro -v /root:/backup alpine tar czf /backup/minio-$(date +%F).tgz -C /data .
+docker compose -f docker-compose.prod.yml start minio
+```
+
+Depois do deploy, confira que os objetos antigos continuam lá e que um avatar existente abre em `/api/media/...`:
+
+```bash
+docker compose -f docker-compose.prod.yml exec minio sh -c 'mc alias set l http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc ls -r l/padelmatch-avatars'
+```
+
+Para voltar atrás: `stop minio`, restaure o backup (`docker run --rm -v padelmatch_minio:/data -v /root:/backup alpine sh -c 'find /data -mindepth 1 -delete && tar xzf /backup/minio-<data>.tgz -C /data'`) e reverta o commit das imagens. As imagens antigas só existem no cache local da VPS.
+
 O console do Keycloak não é exposto. Para usá-lo, publique `127.0.0.1:8180:8180` no serviço `keycloak` e abra um túnel: `ssh -L 8180:localhost:8180 root@<vps>`.
 
 ## Estrutura do repositório
@@ -364,5 +385,6 @@ O console do Keycloak não é exposto. Para usá-lo, publique `127.0.0.1:8180:81
 - **401 no login com Keycloak no ar** — confira `OIDC_*` e `AUTH_KEYCLOAK_CLIENT_ID=stringtracker-expo`. O client da API precisa do secret igual ao do realm.
 - **502 no login/cadastro** — Keycloak ainda não subiu ou realm não importou. Espere o health do Postgres e o log `Keycloak ... started`.
 - **Imagem não abre no celular** — use a URL de `/api/media/...` (mesmo host da API). Não aponte o app direto para a porta 9000 do MinIO.
+- **`pull access denied` para `minio/minio` ou `minio/mc`** — essas imagens não existem mais. Use as `pgsty/*` dos compose atuais (veja [MinIO: imagens e migração](#minio-imagens-e-migração)).
 - **MinIO no Docker, API no host** — `MINIO_ENDPOINT=http://localhost:9000`. Se a API também rodar em container na mesma rede, use `http://minio:9000`.
 - **`Complete seu perfil com a categoria`** — `GET /api/players` e `POST /api/games` exigem categoria e cidade no perfil.
