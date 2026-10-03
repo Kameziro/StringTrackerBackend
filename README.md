@@ -313,13 +313,33 @@ mvn test
 
 Perfil `%test`: H2 em memória (`MODE=PostgreSQL`), Flyway limpa e reaplica, OIDC desligado, JWT de teste via `quarkus-test-security-jwt`. Integração nativa (`-Pnative`) está no `pom.xml` mas ITs vêm desligados por padrão (`skipITs`).
 
+## Deploy (VPS)
+
+`docker-compose.prod.yml` sobe tudo em containers. Só o Caddy expõe portas (80/443) e emite o certificado HTTPS do `DOMAIN` sozinho; Postgres, MinIO e Keycloak ficam na rede interna. O realm de produção (`realm-stringtracker.prod.json`) não tem usuários de teste e lê o secret da API do `.env`.
+
+Na VPS (Ubuntu com Docker), com o DNS do `DOMAIN` apontando para ela:
+
+```bash
+git clone https://github.com/Kameziro/StringTrackerBackend.git && cd StringTrackerBackend
+cp .env.prod.example .env   # preencha os secrets: openssl rand -hex 24
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Atualizar: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+
+O console do Keycloak não é exposto. Para usá-lo, publique `127.0.0.1:8180:8180` no serviço `keycloak` e abra um túnel: `ssh -L 8180:localhost:8180 root@<vps>`.
+
 ## Estrutura do repositório
 
 ```
 .
 ├── docker-compose.yml          # postgres, minio, minio-init, keycloak (profile full)
+├── docker-compose.prod.yml     # produção: + api e caddy (HTTPS), sem portas internas expostas
+├── Dockerfile                  # imagem da API (JVM)
 ├── keycloak/realm-stringtracker.json
+├── keycloak/realm-stringtracker.prod.json
 ├── .env.example
+├── .env.prod.example
 ├── pom.xml                     # artifact stringtracker-api
 ├── .specs/
 │   ├── contracts/api-v1.md
