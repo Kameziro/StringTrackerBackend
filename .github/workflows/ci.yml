@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -17,3 +17,21 @@ jobs:
           cache: maven
       # Dev Services sobe o Postgres dos testes no Docker do runner.
       - run: mvn -B verify
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: production
+    steps:
+      # Entra como `deploy` (sem root); a chave só executa deploy/deploy.sh na VPS.
+      - name: Deploy na VPS
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "187.127.15.144 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICtQnSJ1XwTOr8R+81pxieBzAgmnM1/65dvp9uJp0l6T" > ~/.ssh/known_hosts
+          ssh deploy@187.127.15.144

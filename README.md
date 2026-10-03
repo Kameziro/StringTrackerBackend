@@ -328,7 +328,9 @@ ln -s /opt/padelmatch/deploy/nginx/padel.kameziro.com.br.conf /etc/nginx/sites-e
 nginx -t && systemctl reload nginx
 ```
 
-Atualizar: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+### CI/CD
+
+`.github/workflows/ci.yml` roda `mvn verify` em todo push e PR. Em push na `main`, se os testes passam, o job `deploy` entra na VPS como o usuário `deploy` (sem root, no grupo `docker`, dono de `/opt/padelmatch`) com a chave do secret `DEPLOY_SSH_KEY`. Em `~deploy/.ssh/authorized_keys` essa chave tem `command="/opt/padelmatch/deploy/deploy.sh",restrict`: só consegue rodar o script, que avança o checkout para `origin/main` e refaz a stack. Mudanças em `deploy/nginx/` precisam de reload manual do Nginx, como root.
 
 O console do Keycloak não é exposto. Para usá-lo, publique `127.0.0.1:8180:8180` no serviço `keycloak` e abra um túnel: `ssh -L 8180:localhost:8180 root@<vps>`.
 
