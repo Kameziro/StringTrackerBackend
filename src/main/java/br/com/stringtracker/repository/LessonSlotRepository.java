@@ -65,6 +65,20 @@ public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
                 .getResultList();
     }
 
+    /** Horários reserváveis do professor, em todos os clubes, a partir de {@code from}, com o clube, do mais próximo. */
+    public List<LessonSlot> listBookableOfCoach(long coachId, Instant from) {
+        return getEntityManager().createQuery("""
+                        select s from LessonSlot s join fetch s.clubCoach cc join fetch cc.club
+                        where s.coach.id = :coachId and %s
+                        order by s.startsAt, s.id
+                        """.formatted(BOOKABLE), LessonSlot.class)
+                .setParameter("coachId", coachId)
+                .setParameter("open", LessonSlotStatus.OPEN)
+                .setParameter("from", from)
+                .setParameter("seatStatuses", SEAT_STATUSES)
+                .getResultList();
+    }
+
     /** Trava a agenda do professor até o fim da transação; a linha do professor é o lock de todos os clubes dele. */
     public void lockCoachSchedule(Coach coach) {
         getEntityManager().lock(coach, LockModeType.PESSIMISTIC_WRITE);

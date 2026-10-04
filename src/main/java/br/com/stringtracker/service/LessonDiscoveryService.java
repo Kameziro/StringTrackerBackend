@@ -2,10 +2,11 @@ package br.com.stringtracker.service;
 
 import br.com.stringtracker.dto.LessonClubResponse;
 import br.com.stringtracker.dto.LessonClubSummaryResponse;
+import br.com.stringtracker.dto.LessonCoachResponse;
 import br.com.stringtracker.dto.LessonSlotOption;
 import br.com.stringtracker.model.City;
 import br.com.stringtracker.model.Club;
-import br.com.stringtracker.model.schedule.LessonSlot;
+import br.com.stringtracker.model.ClubCoach;
 import br.com.stringtracker.repository.ClubCoachRepository;
 import br.com.stringtracker.repository.ClubPhotoRepository;
 import br.com.stringtracker.repository.ClubRepository;
@@ -75,6 +76,31 @@ public class LessonDiscoveryService {
                         storage))
                 .toList();
         return LessonClubResponse.from(club, photoRepository.listByClub(clubId), coaches, storage);
+    }
+
+    /**
+     * Página do professor: os clubes ativos onde ele atende (só o {@code clubId}, se informado) com os tipos de aula e
+     * os horários livres de cada um. Sem nenhum vínculo ativo, ou com um {@code clubId} onde ele não atende, o link
+     * não está mais disponível.
+     */
+    @Transactional
+    public LessonCoachResponse getCoach(long coachId, Long clubId) {
+        currentUserService.requireCurrentUser();
+        List<ClubCoach> links = clubCoachRepository.listActiveOfCoach(coachId).stream()
+                .filter(link -> clubId == null || link.getClub().getId().equals(clubId))
+                .toList();
+        if (links.isEmpty()) {
+            throw new LinkUnavailableException();
+        }
+        Map<Long, List<LessonSlotOption>> slotsByClub = lessonSlotRepository.listBookableOfCoach(coachId, bookableFrom())
+                .stream()
+                .collect(Collectors.groupingBy(slot -> slot.getClubCoach().getClub().getId(),
+                        Collectors.mapping(LessonSlotOption::from, Collectors.toList())));
+        List<LessonCoachResponse.ClubEntry> clubs = links.stream()
+                .map(link -> LessonCoachResponse.ClubEntry.from(link,
+                        slotsByClub.getOrDefault(link.getClub().getId(), List.of()), storage))
+                .toList();
+        return LessonCoachResponse.from(links.get(0).getCoach(), clubs, storage);
     }
 
     /** Primeiro início que ainda aceita reserva: as reservas fecham 2h antes da aula. */
