@@ -16,6 +16,7 @@ import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
 import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.repository.BookingRepository;
+import br.com.stringtracker.repository.CityRepository;
 import br.com.stringtracker.repository.ClubAdminRepository;
 import br.com.stringtracker.repository.ClubCoachRepository;
 import br.com.stringtracker.repository.ClubRepository;
@@ -46,6 +47,9 @@ public class ScheduleFixtures {
 
     @Inject
     ClubRepository clubRepository;
+
+    @Inject
+    CityRepository cityRepository;
 
     @Inject
     ClubAdminRepository clubAdminRepository;
@@ -80,6 +84,13 @@ public class ScheduleFixtures {
     public Club club(String prefix) {
         Club club = Club.create(prefix + " " + UUID.randomUUID());
         clubRepository.persist(club);
+        return club;
+    }
+
+    /** Clube numa das cidades semeadas (as buscas por cidade ficam isoladas escolhendo uma cidade só do teste). */
+    public Club club(String prefix, long cityId) {
+        Club club = club(prefix);
+        club.setCity(cityRepository.findById(cityId));
         return club;
     }
 

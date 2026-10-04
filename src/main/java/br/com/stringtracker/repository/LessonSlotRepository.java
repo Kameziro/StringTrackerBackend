@@ -1,5 +1,6 @@
 package br.com.stringtracker.repository;
 
+import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonSlot;
@@ -16,6 +17,53 @@ import java.util.Set;
 
 @ApplicationScoped
 public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
+
+    /**
+     * Horário que um aluno pode reservar: aberto, com vaga sobrando e começando a partir de {@code :from} (a
+     * antecedência mínima da reserva), num vínculo e num clube ativos.
+     */
+    private static final String BOOKABLE = """
+            s.active = true and s.status = :open and s.startsAt >= :from
+            and s.clubCoach.active = true and s.clubCoach.club.active = true
+            and s.capacity > (select count(b) from Booking b
+                              where b.lessonSlot = s and b.active = true and b.status in :seatStatuses)
+            """;
+
+    private static final List<BookingStatus> SEAT_STATUSES = List.of(BookingStatus.HELD, BookingStatus.CONFIRMED);
+
+    /** Clube da cidade com ao menos um horário reservável e o início do primeiro deles. */
+    public record ClubAvailability(Club club, Instant nextFreeAt) {
+    }
+
+    /** Clubes ativos da cidade com horário reservável a partir de {@code from}, por nome. */
+    public List<ClubAvailability> listBookableClubsOfCity(long cityId, Instant from) {
+        return getEntityManager().createQuery("""
+                        select c, min(s.startsAt) from LessonSlot s join s.clubCoach cc join cc.club c
+                        where c.city.id = :cityId and %s
+                        group by c order by c.name, c.id
+                        """.formatted(BOOKABLE), Object[].class)
+                .setParameter("cityId", cityId)
+                .setParameter("open", LessonSlotStatus.OPEN)
+                .setParameter("from", from)
+                .setParameter("seatStatuses", SEAT_STATUSES)
+                .getResultList().stream()
+                .map(row -> new ClubAvailability((Club) row[0], (Instant) row[1]))
+                .toList();
+    }
+
+    /** Horários reserváveis do clube a partir de {@code from}, com o professor e o usuário dele, do mais próximo. */
+    public List<LessonSlot> listBookableOfClub(long clubId, Instant from) {
+        return getEntityManager().createQuery("""
+                        select s from LessonSlot s join fetch s.coach co join fetch co.user
+                        where s.clubCoach.club.id = :clubId and %s
+                        order by s.startsAt, s.id
+                        """.formatted(BOOKABLE), LessonSlot.class)
+                .setParameter("clubId", clubId)
+                .setParameter("open", LessonSlotStatus.OPEN)
+                .setParameter("from", from)
+                .setParameter("seatStatuses", SEAT_STATUSES)
+                .getResultList();
+    }
 
     /** Trava a agenda do professor até o fim da transação; a linha do professor é o lock de todos os clubes dele. */
     public void lockCoachSchedule(Coach coach) {
