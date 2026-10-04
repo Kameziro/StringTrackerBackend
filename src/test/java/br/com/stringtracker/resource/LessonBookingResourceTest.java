@@ -10,7 +10,6 @@ import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubCoach;
 import br.com.stringtracker.model.ClubPaymentStatus;
 import br.com.stringtracker.model.Coach;
-import br.com.stringtracker.model.User;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.LessonSlotStatus;
