@@ -75,6 +75,23 @@ public class BookingRepository implements PanacheRepository<Booking> {
                 .getResultList();
     }
 
+    /**
+     * Aulas do aluno: reservas confirmadas e canceladas (as seguradas e as expiradas nunca viraram aula), com horário,
+     * clube e professor, da aula mais próxima para a mais distante. Inclui as manuais vinculadas à conta dele.
+     */
+    public List<Booking> listLessonsOfStudent(long studentUserId) {
+        return getEntityManager().createQuery("""
+                        select b from Booking b
+                        join fetch b.lessonSlot s join fetch s.clubCoach cc join fetch cc.club
+                        join fetch s.coach co join fetch co.user
+                        where b.studentUser.id = :studentId and b.active = true and b.status in :lessonStatuses
+                        order by s.startsAt, b.id
+                        """, Booking.class)
+                .setParameter("studentId", studentUserId)
+                .setParameter("lessonStatuses", List.of(BookingStatus.CONFIRMED, BookingStatus.CANCELLED))
+                .getResultList();
+    }
+
     /** Ids das reservas ativas (seguradas ou confirmadas) dos horários dados, na ordem em que foram criadas. */
     public List<Long> listActiveIdsOfSlots(Collection<Long> slotIds) {
         if (slotIds.isEmpty()) {
