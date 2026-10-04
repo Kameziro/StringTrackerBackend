@@ -1,5 +1,6 @@
 package br.com.stringtracker.model;
 
+import br.com.stringtracker.model.schedule.LessonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -36,6 +37,14 @@ public class Coach extends BaseEntity {
 
     @Column(name = "offers_group", nullable = false)
     private boolean offersGroup;
+
+    public boolean offers(LessonType type) {
+        return switch (type) {
+            case SINGLES -> offersSingles;
+            case DOUBLES -> offersDoubles;
+            case GROUP -> offersGroup;
+        };
+    }
 
     public static Coach create(User user) {
         Coach coach = new Coach();

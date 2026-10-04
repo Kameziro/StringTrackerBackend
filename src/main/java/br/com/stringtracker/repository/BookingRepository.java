@@ -6,10 +6,15 @@ import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @ApplicationScoped
 public class BookingRepository implements PanacheRepository<Booking> {
+
+    private static final List<BookingStatus> ACTIVE = List.of(BookingStatus.HELD, BookingStatus.CONFIRMED);
 
     /** Reserva ativa (segurada ou confirmada) ocupando uma vaga de um horário. */
     public record ActiveSeat(long slotId, BookingStatus status) {
@@ -27,9 +32,26 @@ public class BookingRepository implements PanacheRepository<Booking> {
                 .setParameter("clubId", clubId)
                 .setParameter("from", from)
                 .setParameter("until", until)
-                .setParameter("activeStatuses", List.of(BookingStatus.HELD, BookingStatus.CONFIRMED))
+                .setParameter("activeStatuses", ACTIVE)
                 .getResultList().stream()
                 .map(row -> new ActiveSeat((Long) row[0], (BookingStatus) row[1]))
                 .toList();
+    }
+
+    // O filtro `active` é explícito: o Hibernate não aplica filtros herdados da BaseEntity (@MappedSuperclass).
+    public Optional<Booking> findByIdAndStudent(long bookingId, long studentUserId) {
+        return find("id = ?1 and studentUser.id = ?2 and active = true", bookingId, studentUserId)
+                .firstResultOptional();
+    }
+
+    /** Números das vagas do horário ocupadas por reserva ativa. */
+    public Set<Short> occupiedSeats(long slotId) {
+        return new HashSet<>(getEntityManager().createQuery("""
+                        select b.seat from Booking b
+                        where b.lessonSlot.id = :slotId and b.active = true and b.status in :activeStatuses
+                        """, Short.class)
+                .setParameter("slotId", slotId)
+                .setParameter("activeStatuses", ACTIVE)
+                .getResultList());
     }
 }

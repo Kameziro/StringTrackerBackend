@@ -3,6 +3,7 @@ package br.com.stringtracker.support;
 import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubAdmin;
 import br.com.stringtracker.model.ClubCoach;
+import br.com.stringtracker.model.ClubPaymentStatus;
 import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.model.User;
 import br.com.stringtracker.model.schedule.Booking;
@@ -18,6 +19,7 @@ import br.com.stringtracker.repository.ClubRepository;
 import br.com.stringtracker.repository.CoachRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.UserRepository;
+import br.com.stringtracker.service.payment.TokenCipher;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -31,6 +33,9 @@ import java.util.UUID;
  */
 @ApplicationScoped
 public class ScheduleFixtures {
+
+    @Inject
+    TokenCipher tokenCipher;
 
     @Inject
     UserRepository userRepository;
@@ -71,6 +76,16 @@ public class ScheduleFixtures {
         return club;
     }
 
+    /** Liga a conta Mercado Pago do clube, com tokens válidos até {@code tokenExpiresAt}. */
+    public Club connectPayments(Club club, Instant tokenExpiresAt) {
+        club.setPaymentStatus(ClubPaymentStatus.CONNECTED);
+        club.setMpUserId("123");
+        club.setMpAccessTokenEnc(tokenCipher.encrypt("club-access-token"));
+        club.setMpRefreshTokenEnc(tokenCipher.encrypt("club-refresh-token"));
+        club.setMpTokenExpiresAt(tokenExpiresAt);
+        return club;
+    }
+
     public void admin(Club club, User user) {
         clubAdminRepository.persist(ClubAdmin.create(club, user));
     }
@@ -99,6 +114,13 @@ public class ScheduleFixtures {
                 (short) 1);
         lessonSlotRepository.persist(slot);
         return slot;
+    }
+
+    /** Reserva de um aluno com conta na vaga 1 do horário, paga por fora. */
+    public Booking studentBooking(LessonSlot slot, BookingStatus status, User student) {
+        Booking booking = booking(slot, status, student);
+        booking.setStudentUser(student);
+        return booking;
     }
 
     /** Reserva de um convidado na vaga 1 do horário, paga por fora. */

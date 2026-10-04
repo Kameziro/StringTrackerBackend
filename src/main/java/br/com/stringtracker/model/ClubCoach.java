@@ -1,5 +1,6 @@
 package br.com.stringtracker.model;
 
+import br.com.stringtracker.model.schedule.LessonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -37,6 +38,15 @@ public class ClubCoach extends BaseEntity {
 
     @Column(name = "price_group_cents")
     private Long priceGroupCents;
+
+    /** Preço em centavos do tipo de aula neste clube; nulo se o clube ainda não definiu. */
+    public Long priceOf(LessonType type) {
+        return switch (type) {
+            case SINGLES -> priceSinglesCents;
+            case DOUBLES -> priceDoublesCents;
+            case GROUP -> priceGroupCents;
+        };
+    }
 
     public static ClubCoach create(Club club, Coach coach) {
         ClubCoach link = new ClubCoach();
