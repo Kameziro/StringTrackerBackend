@@ -63,6 +63,9 @@ public class BookingService {
     RefundService refundService;
 
     @Inject
+    LessonNotifier notifier;
+
+    @Inject
     Clock clock;
 
     /**
@@ -166,8 +169,11 @@ public class BookingService {
         payment.setStatus(PaymentStatus.APPROVED);
         if (booking.getStatus() == BookingStatus.HELD) {
             booking.setStatus(BookingStatus.CONFIRMED);
+            notifier.bookingConfirmed(booking);
+            notifier.coachNewBooking(booking);
         } else {
             refundService.requestRefund(booking);
+            notifier.latePaymentRefunded(booking);
         }
     }
 

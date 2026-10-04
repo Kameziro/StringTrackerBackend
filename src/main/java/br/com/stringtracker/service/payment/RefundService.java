@@ -8,6 +8,7 @@ import br.com.stringtracker.model.schedule.RefundStatus;
 import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.PaymentRepository;
 import br.com.stringtracker.service.BusinessRuleException;
+import br.com.stringtracker.service.LessonNotifier;
 import br.com.stringtracker.service.PaymentProviderException;
 import br.com.stringtracker.service.PaymentProviderUnavailableException;
 import br.com.stringtracker.service.payment.PaymentGateway.ClubCredentials;
@@ -44,6 +45,9 @@ public class RefundService {
     PaymentGateway gateway;
 
     @Inject
+    LessonNotifier notifier;
+
+    @Inject
     Clock clock;
 
     /**
@@ -70,6 +74,9 @@ public class RefundService {
             Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
             if (booking.getRefundStatus() == RefundStatus.PENDING) {
                 attempt(booking, paymentRepository.findByBookingId(bookingId).orElseThrow());
+                if (booking.getRefundStatus() == RefundStatus.DONE) {
+                    notifier.refundCompleted(booking);
+                }
             }
         });
     }

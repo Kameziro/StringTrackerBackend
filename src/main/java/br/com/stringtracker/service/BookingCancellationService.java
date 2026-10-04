@@ -47,6 +47,9 @@ public class BookingCancellationService {
     RefundService refundService;
 
     @Inject
+    LessonNotifier notifier;
+
+    @Inject
     Clock clock;
 
     @Transactional
@@ -60,6 +63,7 @@ public class BookingCancellationService {
         requireNotStarted(booking);
         Instant refundDeadline = booking.getLessonSlot().getStartsAt().minus(FULL_REFUND_NOTICE);
         cancel(booking, student, !clock.instant().isAfter(refundDeadline));
+        notifier.coachBookingCancelled(booking);
         return BookingResponse.from(booking, null);
     }
 
@@ -90,7 +94,7 @@ public class BookingCancellationService {
      * Cancela uma reserva já travada, devolvendo o valor integral se {@code refund}. Reserva segurada (Pix ainda
      * não pago) só libera a vaga: não há o que devolver, e um pagamento tardio é reembolsado pelo webhook.
      */
-    public void cancel(Booking booking, User actor, boolean refund) {
+    private void cancel(Booking booking, User actor, boolean refund) {
         if (booking.getStatus() == BookingStatus.HELD) {
             bookingService.releaseHold(booking, BookingStatus.CANCELLED);
         } else {
@@ -117,7 +121,7 @@ public class BookingCancellationService {
             bookingRepository.findActiveForUpdate(bookingId)
                     .filter(booking -> booking.getStatus().holdsSeat())
                     .ifPresent(booking -> {
-                        cancel(booking, actor, true);
+                        cancelByStaff(booking, actor);
                         cancelled.add(booking);
                     });
         }
@@ -129,8 +133,17 @@ public class BookingCancellationService {
             throw new BusinessRuleException("Esta reserva não pode ser cancelada");
         }
         requireNotStarted(booking);
-        cancel(booking, actor, true);
+        cancelByStaff(booking, actor);
         return BookingResponse.from(booking, null);
+    }
+
+    /** Cancelamento do clube ou do professor: reembolso integral e aviso ao aluno que tinha a aula confirmada. */
+    private void cancelByStaff(Booking booking, User actor) {
+        boolean wasConfirmed = booking.getStatus() == BookingStatus.CONFIRMED;
+        cancel(booking, actor, true);
+        if (wasConfirmed) {
+            notifier.bookingCancelledByStaff(booking);
+        }
     }
 
     private void requireNotStarted(Booking booking) {

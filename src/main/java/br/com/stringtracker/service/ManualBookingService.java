@@ -41,6 +41,9 @@ public class ManualBookingService {
     SeatService seatService;
 
     @Inject
+    LessonNotifier notifier;
+
+    @Inject
     UserRepository userRepository;
 
     @Inject
@@ -93,6 +96,7 @@ public class ManualBookingService {
             booking.setPartnerName(request.partnerName().trim());
         }
         seatService.persist(booking, SLOT_TAKEN);
+        notifier.bookingConfirmed(booking);
         return BookingResponse.from(booking, null);
     }
 
