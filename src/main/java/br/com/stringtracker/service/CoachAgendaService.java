@@ -13,12 +13,9 @@ import br.com.stringtracker.repository.PaymentRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.BadRequestException;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -50,14 +47,11 @@ public class CoachAgendaService {
     @Transactional
     public CoachAgendaResponse agenda(String fromText, String toText) {
         Coach coach = access.requireCurrentCoach();
-        LocalDate from = fromText == null || fromText.isBlank() ? LocalDate.now(clock) : parse(fromText);
-        LocalDate to = toText == null || toText.isBlank() ? from.plusDays(DEFAULT_DAYS - 1) : parse(toText);
-        if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) >= MAX_DAYS) {
-            throw new BadRequestException("Período inválido: use até %d dias, com 'to' depois de 'from'".formatted(MAX_DAYS));
-        }
+        LocalDate from = fromText == null || fromText.isBlank() ? LocalDate.now(clock) : DatePeriod.parseDate(fromText);
+        LocalDate to = toText == null || toText.isBlank() ? from.plusDays(DEFAULT_DAYS - 1) : DatePeriod.parseDate(toText);
+        DatePeriod period = DatePeriod.of(from, to, MAX_DAYS);
 
-        List<LessonSlot> slots = lessonSlotRepository.listOfCoach(coach.getId(),
-                from.atStartOfDay(clock.getZone()).toInstant(), to.plusDays(1).atStartOfDay(clock.getZone()).toInstant());
+        List<LessonSlot> slots = lessonSlotRepository.listOfCoach(coach.getId(), period.start(clock), period.end(clock));
         List<Booking> bookings = bookingRepository.listActiveOfSlots(LessonSlot.idsOf(slots));
         Map<Long, PaymentStatus> payments = paymentRepository.statusByBookingId(
                 bookings.stream().map(Booking::getId).toList());
@@ -71,13 +65,5 @@ public class CoachAgendaService {
                     ofSlot.stream().map(booking -> CoachAgendaResponse.Lesson.from(booking,
                             payments.get(booking.getId()))).toList());
         }).toList());
-    }
-
-    private static LocalDate parse(String text) {
-        try {
-            return LocalDate.parse(text.trim());
-        } catch (DateTimeParseException e) {
-            throw new BadRequestException("Data inválida: use o formato AAAA-MM-DD");
-        }
     }
 }

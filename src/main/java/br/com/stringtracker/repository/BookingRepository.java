@@ -76,6 +76,25 @@ public class BookingRepository implements PanacheRepository<Booking> {
     }
 
     /**
+     * Reservas ativas de qualquer estado dos horários do clube que começam entre {@code from} (inclusive) e
+     * {@code until} (exclusivo), com horário, professor e aluno carregados, por início do horário.
+     */
+    public List<Booking> listOfClub(long clubId, Instant from, Instant until) {
+        return getEntityManager().createQuery("""
+                        select b from Booking b
+                        join fetch b.lessonSlot s join fetch s.coach co join fetch co.user
+                        left join fetch b.studentUser
+                        where s.clubCoach.club.id = :clubId and s.startsAt >= :from and s.startsAt < :until
+                          and b.active = true
+                        order by s.startsAt, b.id
+                        """, Booking.class)
+                .setParameter("clubId", clubId)
+                .setParameter("from", from)
+                .setParameter("until", until)
+                .getResultList();
+    }
+
+    /**
      * Aulas do aluno: reservas confirmadas e canceladas (as seguradas e as expiradas nunca viraram aula), com horário,
      * clube e professor, da aula mais próxima para a mais distante. Inclui as manuais vinculadas à conta dele.
      */
