@@ -77,11 +77,19 @@ public class Booking extends BaseEntity {
     private Instant cancelledAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "refund_status", nullable = false, length = 8)
+    @Column(name = "refund_status", nullable = false, length = 20)
     private RefundStatus refundStatus = RefundStatus.NONE;
 
     @Column(name = "refund_amount_cents")
     private Long refundAmountCents;
+
+    /** Admin que marcou o reembolso como {@link RefundStatus#RESOLVED_MANUALLY}, e quando. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "refund_resolved_by")
+    private User refundResolvedBy;
+
+    @Column(name = "refund_resolved_at")
+    private Instant refundResolvedAt;
 
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;

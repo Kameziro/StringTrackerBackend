@@ -54,4 +54,18 @@ public class BookingAdminResource {
     public BookingResponse cancel(@PathParam("clubId") long clubId, @PathParam("id") long id) {
         return cancellationService.cancelByClub(clubId, id);
     }
+
+    @POST
+    @Path("/{id}/refund/retry")
+    @Consumes(MediaType.WILDCARD)
+    public BookingResponse retryRefund(@PathParam("clubId") long clubId, @PathParam("id") long id) {
+        return cancellationService.restartRefund(clubId, id);
+    }
+
+    @POST
+    @Path("/{id}/refund/resolve")
+    @Consumes(MediaType.WILDCARD)
+    public BookingResponse resolveRefund(@PathParam("clubId") long clubId, @PathParam("id") long id) {
+        return cancellationService.resolveRefundManually(clubId, id);
+    }
 }

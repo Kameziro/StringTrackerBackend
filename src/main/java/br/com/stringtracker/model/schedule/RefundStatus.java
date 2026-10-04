@@ -4,5 +4,7 @@ public enum RefundStatus {
     NONE,
     PENDING,
     DONE,
-    FAILED
+    FAILED,
+    /** Reembolso que falhou e o admin do clube resolveu por fora do provedor. */
+    RESOLVED_MANUALLY
 }

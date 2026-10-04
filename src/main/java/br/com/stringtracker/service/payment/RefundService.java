@@ -1,5 +1,6 @@
 package br.com.stringtracker.service.payment;
 
+import br.com.stringtracker.model.User;
 import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
@@ -25,7 +26,8 @@ import java.time.Instant;
 /**
  * Reembolso total de reserva paga com Pix, sem perder reembolso que falhou (CANC-05): a falha deixa a reserva
  * com {@code refund_status = PENDING} e o {@code RefundRetryJob} tenta de novo a cada 15 minutos. Passadas
- * 24 horas de tentativas (a inicial mais 96 retentativas) o reembolso vira {@code FAILED}, para ação manual do admin.
+ * 24 horas de tentativas (a inicial mais 96 retentativas) o reembolso vira {@code FAILED}, e o admin do clube pode
+ * reiniciar as tentativas ({@link #restart}) ou marcá-lo como resolvido por fora ({@link #resolveManually}).
  */
 @ApplicationScoped
 public class RefundService {
@@ -73,12 +75,43 @@ public class RefundService {
         paymentRepository.findBookingIdByPaymentId(paymentId).ifPresent(bookingId -> {
             Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
             if (booking.getRefundStatus() == RefundStatus.PENDING) {
-                attempt(booking, paymentRepository.findByBookingId(bookingId).orElseThrow());
-                if (booking.getRefundStatus() == RefundStatus.DONE) {
-                    notifier.refundCompleted(booking);
-                }
+                attemptAndNotify(booking, paymentRepository.findByBookingId(bookingId).orElseThrow());
             }
         });
+    }
+
+    /**
+     * O admin reinicia as tentativas de um reembolso FAILED: a contagem volta a zero e já há uma tentativa agora. Se
+     * ela falha, o reembolso volta a PENDING e o job retoma de 15 em 15 minutos. A reserva vem travada.
+     */
+    @Transactional
+    public void restart(Booking booking) {
+        requireFailed(booking);
+        Payment payment = paymentRepository.findByBookingId(booking.getId()).orElseThrow();
+        payment.setRefundAttempts(0);
+        attemptAndNotify(booking, payment);
+    }
+
+    /** O admin deu o reembolso FAILED por resolvido fora do provedor: guarda quem e quando. A reserva vem travada. */
+    @Transactional
+    public void resolveManually(Booking booking, User admin) {
+        requireFailed(booking);
+        booking.setRefundStatus(RefundStatus.RESOLVED_MANUALLY);
+        booking.setRefundResolvedBy(admin);
+        booking.setRefundResolvedAt(clock.instant());
+    }
+
+    private static void requireFailed(Booking booking) {
+        if (booking.getRefundStatus() != RefundStatus.FAILED) {
+            throw new BusinessRuleException("Só um reembolso que falhou pode ser reiniciado ou resolvido manualmente");
+        }
+    }
+
+    private void attemptAndNotify(Booking booking, Payment payment) {
+        attempt(booking, payment);
+        if (booking.getRefundStatus() == RefundStatus.DONE) {
+            notifier.refundCompleted(booking);
+        }
     }
 
     private void attempt(Booking booking, Payment payment) {

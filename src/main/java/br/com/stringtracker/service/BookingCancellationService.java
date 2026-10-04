@@ -23,7 +23,8 @@ import java.util.List;
 /**
  * Cancelamento de reserva por aluno, clube ou professor, com o registro de quem cancelou, quando e quanto foi
  * devolvido (CANC-06). O aluno só tem reembolso com 24h ou mais de antecedência; clube e professor devolvem
- * sempre o valor integral. Todo cancelamento acontece com a linha da reserva travada, antes do pagamento.
+ * sempre o valor integral. Todo cancelamento acontece com a linha da reserva travada, antes do pagamento. Reúne
+ * também as ações do admin sobre um reembolso que falhou (reiniciar e resolver manualmente), com a mesma trava.
  */
 @ApplicationScoped
 public class BookingCancellationService {
@@ -71,15 +72,40 @@ public class BookingCancellationService {
     public BookingResponse cancelByClub(long clubId, long bookingId) {
         access.requireClubAdmin(clubId);
         User admin = currentUserService.requireCurrentUser();
+        Booking booking = lockClubBooking(clubId, bookingId);
+        if (cancelWithFullRefund(booking, admin)) {
+            notifier.coachBookingCancelledByClub(booking);
+        }
+        return BookingResponse.from(booking, null);
+    }
+
+    /** Reinicia as tentativas de um reembolso que falhou e tenta já (CANC-05). Só admin do clube da reserva. */
+    @Transactional
+    public BookingResponse restartRefund(long clubId, long bookingId) {
+        access.requireClubAdmin(clubId);
+        Booking booking = lockClubBooking(clubId, bookingId);
+        refundService.restart(booking);
+        return BookingResponse.from(booking, null);
+    }
+
+    /** Dá por resolvido por fora um reembolso que falhou, registrando quem e quando (CANC-05). */
+    @Transactional
+    public BookingResponse resolveRefundManually(long clubId, long bookingId) {
+        access.requireClubAdmin(clubId);
+        User admin = currentUserService.requireCurrentUser();
+        Booking booking = lockClubBooking(clubId, bookingId);
+        refundService.resolveManually(booking, admin);
+        return BookingResponse.from(booking, null);
+    }
+
+    /** A reserva ativa travada, que tem de ser do clube dado. */
+    private Booking lockClubBooking(long clubId, long bookingId) {
         Booking booking = bookingRepository.findActiveForUpdate(bookingId)
                 .orElseThrow(BookingCancellationService::notFound);
         if (booking.getLessonSlot().getClubCoach().getClub().getId() != clubId) {
             throw new ForbiddenException("Esta reserva é de outro clube");
         }
-        if (cancelWithFullRefund(booking, admin)) {
-            notifier.coachBookingCancelledByClub(booking);
-        }
-        return BookingResponse.from(booking, null);
+        return booking;
     }
 
     @Transactional

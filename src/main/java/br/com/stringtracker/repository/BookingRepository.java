@@ -82,13 +82,14 @@ public class BookingRepository implements PanacheRepository<Booking> {
 
     /**
      * Reservas ativas de qualquer estado dos horários do clube que começam entre {@code from} (inclusive) e
-     * {@code until} (exclusivo), com horário, professor e aluno carregados, por início do horário.
+     * {@code until} (exclusivo), com horário, professor, aluno e admin que resolveu o reembolso carregados, por início
+     * do horário.
      */
     public List<Booking> listOfClub(long clubId, Instant from, Instant until) {
         return getEntityManager().createQuery("""
                         select b from Booking b
                         join fetch b.lessonSlot s join fetch s.coach co join fetch co.user
-                        left join fetch b.studentUser
+                        left join fetch b.studentUser left join fetch b.refundResolvedBy
                         where s.clubCoach.club.id = :clubId and s.startsAt >= :from and s.startsAt < :until
                           and b.active = true
                         order by s.startsAt, b.id

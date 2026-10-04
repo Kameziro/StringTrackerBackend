@@ -180,7 +180,7 @@ public class LessonNotifier {
             case DONE -> " O valor de %s foi devolvido.".formatted(money(booking.getRefundAmountCents()));
             case PENDING, FAILED -> " O reembolso de %s está sendo processado.".formatted(
                     money(booking.getRefundAmountCents()));
-            case NONE -> "";
+            case NONE, RESOLVED_MANUALLY -> "";
         };
     }
 

@@ -58,9 +58,10 @@ class ClubBookingsResourceTest {
     private Booking cancelledRefunded;
     private Booking heldPix;
     private Booking expiredPix;
+    private Booking refundResolved;
 
     /**
-     * Semana de 05 a 11/10 (UTC-3): cinco reservas de estados diferentes dentro dela, mais uma de outro clube,
+     * Semana de 05 a 11/10 (UTC-3): seis reservas de estados diferentes dentro dela, mais uma de outro clube,
      * uma desativada e as que caem um minuto fora das bordas do período.
      */
     @BeforeEach
@@ -98,6 +99,14 @@ class ClubBookingsResourceTest {
                     BookingStatus.HELD, PaymentStatus.PENDING, order + "3");
             expiredPix = fixtures.pixBooking(fixtures.slot(link, Instant.parse("2026-10-10T15:00:00Z")), student,
                     BookingStatus.EXPIRED, PaymentStatus.EXPIRED, order + "4");
+            refundResolved = fixtures.pixBooking(fixtures.slot(link, Instant.parse("2026-10-11T14:00:00Z")), student,
+                    BookingStatus.CANCELLED, PaymentStatus.APPROVED, order + "5");
+            refundResolved.setCancelledAt(Instant.parse("2026-10-07T12:00:00Z"));
+            refundResolved.setCancelledBy(admin);
+            refundResolved.setRefundStatus(RefundStatus.RESOLVED_MANUALLY);
+            refundResolved.setRefundAmountCents(9000L);
+            refundResolved.setRefundResolvedBy(admin);
+            refundResolved.setRefundResolvedAt(Instant.parse("2026-10-07T14:30:00Z"));
 
             // Bordas: um minuto antes de domingo 04 acabar e exatamente 00:00 de 12/10 em São Paulo ficam fora da semana.
             fixtures.booking(fixtures.slot(link, Instant.parse("2026-10-05T02:59:00Z")), BookingStatus.CONFIRMED, admin);
@@ -142,10 +151,10 @@ class ClubBookingsResourceTest {
                 .body("from", equalTo("2026-10-05"))
                 .body("to", equalTo("2026-10-11"))
                 .body("bookings.bookingId", contains(id(confirmedPix), id(offlineGuest), id(cancelledRefunded),
-                        id(heldPix), id(expiredPix)))
-                .body("bookings.status", contains("CONFIRMED", "CONFIRMED", "CANCELLED", "HELD", "EXPIRED"))
-                .body("bookings.paymentMode", contains("PIX", "OFFLINE", "PIX", "PIX", "PIX"))
-                .body("bookings.paymentStatus", contains("APPROVED", null, "REFUNDED", "PENDING", "EXPIRED"));
+                        id(heldPix), id(expiredPix), id(refundResolved)))
+                .body("bookings.status", contains("CONFIRMED", "CONFIRMED", "CANCELLED", "HELD", "EXPIRED", "CANCELLED"))
+                .body("bookings.paymentMode", contains("PIX", "OFFLINE", "PIX", "PIX", "PIX", "PIX"))
+                .body("bookings.paymentStatus", contains("APPROVED", null, "REFUNDED", "PENDING", "EXPIRED", "APPROVED"));
     }
 
     @Test
@@ -168,6 +177,20 @@ class ClubBookingsResourceTest {
                 .body("bookings[2].cancelledAt", equalTo("2026-10-07T12:00:00Z"))
                 .body("bookings[2].refundStatus", equalTo("DONE"))
                 .body("bookings[2].refundAmountCents", equalTo(9000));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void aRefundResolvedManually_showsWhoAndWhen_andOtherRefundsDoNot() {
+        period("2026-10-05", "2026-10-11").when().get(url())
+                .then().statusCode(200)
+                .body("bookings[5].refundStatus", equalTo("RESOLVED_MANUALLY"))
+                .body("bookings[5].refundAmountCents", equalTo(9000))
+                .body("bookings[5].refundResolvedBy", equalTo(ADMIN))
+                .body("bookings[5].refundResolvedAt", equalTo("2026-10-07T14:30:00Z"))
+                .body("bookings[2].refundResolvedBy", nullValue())
+                .body("bookings[2].refundResolvedAt", nullValue());
     }
 
     @Test
@@ -243,11 +266,11 @@ class ClubBookingsResourceTest {
         long forOne = statistics.getPrepareStatementCount() - before;
 
         before = statistics.getPrepareStatementCount();
-        period("2026-10-05", "2026-10-11").when().get(url()).then().body("bookings", hasSize(5));
-        long forFive = statistics.getPrepareStatementCount() - before;
+        period("2026-10-05", "2026-10-11").when().get(url()).then().body("bookings", hasSize(6));
+        long forSix = statistics.getPrepareStatementCount() - before;
 
         assertTrue(forOne > 0, "as estatísticas do Hibernate precisam estar ligadas");
-        assertEquals(forOne, forFive);
+        assertEquals(forOne, forSix);
     }
 
     @Test
