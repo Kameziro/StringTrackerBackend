@@ -7,6 +7,7 @@ import br.com.stringtracker.model.schedule.LessonSlotStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.TypedQuery;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -28,6 +29,33 @@ public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
                         and status <> ?4 and active = true order by startsAt
                         """,
                 clubId, from, until, LessonSlotStatus.REMOVED);
+    }
+
+    /**
+     * Horários do professor que começam entre {@code dayStart} (inclusive) e {@code dayEnd} (exclusivo) e depois de
+     * {@code now}, sem os removidos, por id. {@code clubId} nulo vale para todos os clubes do professor.
+     * Com {@code lock} diferente de NONE as linhas ficam travadas até o fim da transação.
+     */
+    public List<LessonSlot> listUpcomingOfCoachOnDay(long coachId, Long clubId, Instant dayStart, Instant dayEnd,
+                                                     Instant now, LockModeType lock) {
+        String clubFilter = clubId == null ? "" : "and s.clubCoach.club.id = :clubId";
+        TypedQuery<LessonSlot> query = getEntityManager().createQuery("""
+                select s from LessonSlot s
+                where s.coach.id = :coachId and s.startsAt >= :dayStart and s.startsAt < :dayEnd
+                  and s.startsAt > :now and s.status <> :removed and s.active = true
+                  %s
+                order by s.id
+                """.formatted(clubFilter), LessonSlot.class)
+                .setParameter("coachId", coachId)
+                .setParameter("dayStart", dayStart)
+                .setParameter("dayEnd", dayEnd)
+                .setParameter("now", now)
+                .setParameter("removed", LessonSlotStatus.REMOVED)
+                .setLockMode(lock);
+        if (clubId != null) {
+            query.setParameter("clubId", clubId);
+        }
+        return query.getResultList();
     }
 
     /** Inícios dos horários do bloco entre {@code from} (inclusive) e {@code until} (exclusivo), em qualquer status. */

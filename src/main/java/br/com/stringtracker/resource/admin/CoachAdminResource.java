@@ -2,8 +2,11 @@ package br.com.stringtracker.resource.admin;
 
 import br.com.stringtracker.dto.CoachPricesResponse;
 import br.com.stringtracker.dto.CreateScheduleBlockRequest;
+import br.com.stringtracker.dto.DayBlockRequest;
+import br.com.stringtracker.dto.DayBlockResponse;
 import br.com.stringtracker.dto.UpdateCoachPricesRequest;
 import br.com.stringtracker.service.CoachService;
+import br.com.stringtracker.service.DayBlockService;
 import br.com.stringtracker.service.ScheduleService;
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
@@ -30,6 +33,9 @@ public class CoachAdminResource {
     @Inject
     ScheduleService scheduleService;
 
+    @Inject
+    DayBlockService dayBlockService;
+
     @PUT
     @Path("/{coachId}/prices")
     public CoachPricesResponse updatePrices(
@@ -50,5 +56,15 @@ public class CoachAdminResource {
         return Response.status(Response.Status.CREATED)
                 .entity(scheduleService.createBlock(clubId, coachId, request))
                 .build();
+    }
+
+    @POST
+    @Path("/{coachId}/day-blocks")
+    public DayBlockResponse blockDay(
+            @PathParam("clubId") long clubId,
+            @PathParam("coachId") long coachId,
+            @Valid DayBlockRequest request
+    ) {
+        return dayBlockService.blockForClub(clubId, coachId, request);
     }
 }

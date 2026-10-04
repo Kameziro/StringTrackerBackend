@@ -25,4 +25,12 @@ public class DayBlockRepository implements PanacheRepository<DayBlock> {
                 .setParameter("until", until)
                 .getResultList());
     }
+
+    /** Se o professor já tem esse dia bloqueado com o mesmo alcance: um clube ({@code clubId}) ou todos (nulo). */
+    public boolean exists(long coachId, Long clubId, LocalDate day) {
+        if (clubId == null) {
+            return count("coach.id = ?1 and day = ?2 and club is null and active = true", coachId, day) > 0;
+        }
+        return count("coach.id = ?1 and day = ?2 and club.id = ?3 and active = true", coachId, day, clubId) > 0;
+    }
 }

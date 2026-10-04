@@ -86,6 +86,11 @@ public class Booking extends BaseEntity {
     @Column(name = "reminder_sent_at")
     private Instant reminderSentAt;
 
+    /** Quem faz a aula: o aluno com conta ou, sem conta, o nome do convidado. */
+    public String studentName() {
+        return studentUser != null ? studentUser.getName() : guestName;
+    }
+
     public static Booking create(LessonSlot lessonSlot, short seat, LessonType lessonType, long priceCents,
                                  PaymentMode paymentMode, BookingStatus status, User createdBy) {
         Booking booking = new Booking();

@@ -16,6 +16,9 @@ import jakarta.ws.rs.NotFoundException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Cancelamento de reserva por aluno, clube ou professor, com o registro de quem cancelou, quando e quanto foi
@@ -103,8 +106,26 @@ public class BookingCancellationService {
         }
     }
 
+    /**
+     * Cancela com reembolso integral as reservas ativas dos ids dados (as que já não estão ativas ficam de fora) e
+     * devolve as canceladas. Cada reserva é travada antes de ser lida: um webhook ou o job de expiração pode
+     * ter mudado o estado dela desde que os ids foram listados.
+     */
+    public List<Booking> cancelAllWithFullRefund(Collection<Long> bookingIds, User actor) {
+        List<Booking> cancelled = new ArrayList<>();
+        for (long bookingId : bookingIds) {
+            bookingRepository.findActiveForUpdate(bookingId)
+                    .filter(booking -> booking.getStatus().holdsSeat())
+                    .ifPresent(booking -> {
+                        cancel(booking, actor, true);
+                        cancelled.add(booking);
+                    });
+        }
+        return cancelled;
+    }
+
     private BookingResponse cancelWithFullRefund(Booking booking, User actor) {
-        if (booking.getStatus() != BookingStatus.HELD && booking.getStatus() != BookingStatus.CONFIRMED) {
+        if (!booking.getStatus().holdsSeat()) {
             throw new BusinessRuleException("Esta reserva não pode ser cancelada");
         }
         requireNotStarted(booking);
