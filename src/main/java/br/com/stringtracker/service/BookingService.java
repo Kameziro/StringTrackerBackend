@@ -17,6 +17,7 @@ import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.PaymentRepository;
 import br.com.stringtracker.service.payment.PaymentGateway;
+import br.com.stringtracker.service.payment.PaymentGateway.ClubCredentials;
 import br.com.stringtracker.service.payment.PaymentGateway.PixCharge;
 import br.com.stringtracker.service.payment.RefundService;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,6 +26,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceException;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import org.jboss.logging.Logger;
 
 import java.sql.SQLException;
 import java.time.Clock;
@@ -43,6 +45,7 @@ public class BookingService {
     public static final Duration HOLD = Duration.ofMinutes(10);
     public static final Duration BOOKING_CLOSES_BEFORE_START = Duration.ofHours(2);
 
+    private static final Logger LOG = Logger.getLogger(BookingService.class);
     private static final String PROVIDER = "MERCADOPAGO";
     private static final String SEAT_TAKEN = "Esse horário acabou de ser reservado";
     private static final String UNIQUE_VIOLATION = "23505";
@@ -100,6 +103,35 @@ public class BookingService {
 
         return BookingResponse.from(booking, new BookingResponse.Pix(charge.qrCodeBase64(), charge.qrCode(),
                 charge.ticketUrl(), booking.getHoldExpiresAt()));
+    }
+
+    /**
+     * Expira o hold vencido: a reserva e o pagamento viram EXPIRED, a vaga fica livre para outro aluno e o Pix é
+     * cancelado no provedor. O relógio do hold é o da API; falha no cancelamento não impede a expiração, já que o
+     * Pix também vence sozinho no provedor e um pagamento tardio é reembolsado pelo webhook.
+     */
+    @Transactional
+    public void expireHold(long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
+        if (booking.getStatus() != BookingStatus.HELD || !booking.getHoldExpiresAt().isBefore(clock.instant())) {
+            return;
+        }
+        booking.setStatus(BookingStatus.EXPIRED);
+        paymentRepository.findByBookingId(bookingId).ifPresent(payment -> {
+            if (payment.getStatus() == PaymentStatus.PENDING) {
+                payment.setStatus(PaymentStatus.EXPIRED);
+            }
+            cancelAtProvider(booking, payment);
+        });
+    }
+
+    private void cancelAtProvider(Booking booking, Payment payment) {
+        try {
+            ClubCredentials credentials = gateway.refreshIfNeeded(booking.getLessonSlot().getClubCoach().getClub());
+            gateway.cancel(credentials, payment.getProviderPaymentId(), "cancel-" + booking.getId());
+        } catch (RuntimeException e) {
+            LOG.warnf("Pix da reserva %d não foi cancelado no provedor: %s", booking.getId(), e.getMessage());
+        }
     }
 
     /** A reserva só é visível ao aluno que a fez; para os demais ela não existe. */

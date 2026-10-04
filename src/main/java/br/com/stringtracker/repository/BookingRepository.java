@@ -44,6 +44,18 @@ public class BookingRepository implements PanacheRepository<Booking> {
                 .firstResultOptional();
     }
 
+    /** Ids das reservas seguradas cujo hold já venceu, as mais antigas primeiro. */
+    public List<Long> listExpiredHoldIds(Instant now) {
+        return getEntityManager().createQuery("""
+                        select b.id from Booking b
+                        where b.status = :held and b.active = true and b.holdExpiresAt < :now
+                        order by b.holdExpiresAt
+                        """, Long.class)
+                .setParameter("held", BookingStatus.HELD)
+                .setParameter("now", now)
+                .getResultList();
+    }
+
     /** Números das vagas do horário ocupadas por reserva ativa. */
     public Set<Short> occupiedSeats(long slotId) {
         return new HashSet<>(getEntityManager().createQuery("""
