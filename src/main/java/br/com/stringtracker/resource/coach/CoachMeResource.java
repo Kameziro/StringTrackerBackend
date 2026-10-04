@@ -1,5 +1,6 @@
 package br.com.stringtracker.resource.coach;
 
+import br.com.stringtracker.dto.CoachMeResponse;
 import br.com.stringtracker.dto.CoachOffersResponse;
 import br.com.stringtracker.dto.DayBlockRequest;
 import br.com.stringtracker.dto.DayBlockResponse;
@@ -36,6 +37,11 @@ public class CoachMeResource {
 
     @Inject
     StudentSearchService studentSearchService;
+
+    @GET
+    public CoachMeResponse me() {
+        return coachService.me();
+    }
 
     @PUT
     @Path("/offers")

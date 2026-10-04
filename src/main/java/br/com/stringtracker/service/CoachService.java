@@ -2,6 +2,7 @@ package br.com.stringtracker.service;
 
 import br.com.stringtracker.dto.AffectedBookingResponse;
 import br.com.stringtracker.dto.ClubCoachesResponse;
+import br.com.stringtracker.dto.CoachMeResponse;
 import br.com.stringtracker.dto.CoachOffersResponse;
 import br.com.stringtracker.dto.CoachPricesResponse;
 import br.com.stringtracker.dto.PendingInviteResponse;
@@ -75,6 +76,13 @@ public class CoachService {
                         .map(link -> ClubCoachesResponse.Coach.from(link, storage)).toList(),
                 inviteRepository.listPendingOfClub(clubId, InviteKind.COACH).stream()
                         .map(invite -> PendingInviteResponse.from(invite, now)).toList());
+    }
+
+    /** O perfil do professor logado: tipos que oferece e, por clube ativo onde atende, os preços do clube. */
+    @Transactional
+    public CoachMeResponse me() {
+        Coach coach = access.requireCurrentCoach();
+        return CoachMeResponse.from(coach, clubCoachRepository.listActiveOfCoach(coach.getId()), storage);
     }
 
     @Transactional
