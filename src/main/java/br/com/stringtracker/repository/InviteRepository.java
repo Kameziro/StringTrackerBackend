@@ -27,4 +27,10 @@ public class InviteRepository implements PanacheRepository<Invite> {
         return list("club.id = ?1 and email = ?2 and kind = ?3 and acceptedAt is null and active = true",
                 clubId, email, kind);
     }
+
+    /** Convites do tipo ainda não aceitos, os mais recentes primeiro; reemitir invalida o anterior, então não há repetidos. */
+    public List<Invite> listPendingOfClub(long clubId, InviteKind kind) {
+        return list("club.id = ?1 and kind = ?2 and acceptedAt is null and active = true order by id desc",
+                clubId, kind);
+    }
 }

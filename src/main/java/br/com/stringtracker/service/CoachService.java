@@ -1,19 +1,23 @@
 package br.com.stringtracker.service;
 
 import br.com.stringtracker.dto.AffectedBookingResponse;
+import br.com.stringtracker.dto.ClubCoachesResponse;
 import br.com.stringtracker.dto.CoachOffersResponse;
 import br.com.stringtracker.dto.CoachPricesResponse;
+import br.com.stringtracker.dto.PendingInviteResponse;
 import br.com.stringtracker.dto.UnlinkCoachResponse;
 import br.com.stringtracker.dto.UpdateCoachOffersRequest;
 import br.com.stringtracker.dto.UpdateCoachPricesRequest;
 import br.com.stringtracker.model.ClubCoach;
 import br.com.stringtracker.model.Coach;
+import br.com.stringtracker.model.InviteKind;
 import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.LessonSlotStatus;
 import br.com.stringtracker.model.schedule.ScheduleBlock;
 import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.ClubCoachRepository;
+import br.com.stringtracker.repository.InviteRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.ScheduleBlockRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,6 +27,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -53,7 +58,24 @@ public class CoachService {
     BookingCancellationService cancellationService;
 
     @Inject
+    InviteRepository inviteRepository;
+
+    @Inject
+    MinioObjectStorage storage;
+
+    @Inject
     Clock clock;
+
+    @Transactional
+    public ClubCoachesResponse listCoaches(long clubId) {
+        access.requireClubAdmin(clubId);
+        Instant now = clock.instant();
+        return new ClubCoachesResponse(
+                clubCoachRepository.listActiveOfClub(clubId).stream()
+                        .map(link -> ClubCoachesResponse.Coach.from(link, storage)).toList(),
+                inviteRepository.listPendingOfClub(clubId, InviteKind.COACH).stream()
+                        .map(invite -> PendingInviteResponse.from(invite, now)).toList());
+    }
 
     @Transactional
     public CoachOffersResponse updateOffers(UpdateCoachOffersRequest request) {

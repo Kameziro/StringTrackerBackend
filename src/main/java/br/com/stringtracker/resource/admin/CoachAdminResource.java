@@ -1,5 +1,6 @@
 package br.com.stringtracker.resource.admin;
 
+import br.com.stringtracker.dto.ClubCoachesResponse;
 import br.com.stringtracker.dto.CoachPricesResponse;
 import br.com.stringtracker.dto.CreateScheduleBlockRequest;
 import br.com.stringtracker.dto.DayBlockRequest;
@@ -14,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -38,6 +40,11 @@ public class CoachAdminResource {
 
     @Inject
     DayBlockService dayBlockService;
+
+    @GET
+    public ClubCoachesResponse listCoaches(@PathParam("clubId") long clubId) {
+        return coachService.listCoaches(clubId);
+    }
 
     @PUT
     @Path("/{coachId}/prices")

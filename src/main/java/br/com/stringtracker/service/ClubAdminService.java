@@ -1,13 +1,18 @@
 package br.com.stringtracker.service;
 
+import br.com.stringtracker.dto.ClubAdminsResponse;
 import br.com.stringtracker.dto.ClubPhotoResponse;
 import br.com.stringtracker.dto.ClubProfileResponse;
 import br.com.stringtracker.dto.InviteResponse;
+import br.com.stringtracker.dto.PendingInviteResponse;
 import br.com.stringtracker.dto.UpdateClubProfileRequest;
 import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubPhoto;
+import br.com.stringtracker.model.InviteKind;
+import br.com.stringtracker.repository.ClubAdminRepository;
 import br.com.stringtracker.repository.ClubPhotoRepository;
 import br.com.stringtracker.repository.ClubRepository;
+import br.com.stringtracker.repository.InviteRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -18,6 +23,8 @@ import org.jboss.resteasy.reactive.multipart.FileUpload;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 /** Perfil, imagens e convites do clube. Todo método exige ser admin do clube pedido. */
@@ -36,7 +43,16 @@ public class ClubAdminService {
     ClubPhotoRepository photoRepository;
 
     @Inject
+    ClubAdminRepository adminRepository;
+
+    @Inject
+    InviteRepository inviteRepository;
+
+    @Inject
     InviteService inviteService;
+
+    @Inject
+    Clock clock;
 
     @Inject
     MinioObjectStorage storage;
@@ -100,6 +116,16 @@ public class ClubAdminService {
                 .orElseThrow(() -> new NotFoundException("Foto não encontrada"));
         photo.markExcluded();
         storage.deleteObjectIfPresent(photo.getUrl());
+    }
+
+    @Transactional
+    public ClubAdminsResponse listAdmins(long clubId) {
+        access.requireClubAdmin(clubId);
+        Instant now = clock.instant();
+        return new ClubAdminsResponse(
+                adminRepository.listActiveOfClub(clubId).stream().map(ClubAdminsResponse.Admin::from).toList(),
+                inviteRepository.listPendingOfClub(clubId, InviteKind.CLUB_ADMIN).stream()
+                        .map(invite -> PendingInviteResponse.from(invite, now)).toList());
     }
 
     public InviteResponse inviteAdmin(long clubId, String email) {

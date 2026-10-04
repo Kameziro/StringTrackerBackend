@@ -1,5 +1,6 @@
 package br.com.stringtracker.resource.admin;
 
+import br.com.stringtracker.dto.ClubAdminsResponse;
 import br.com.stringtracker.dto.ClubProfileResponse;
 import br.com.stringtracker.dto.ConnectUrlResponse;
 import br.com.stringtracker.dto.InviteRequest;
@@ -88,6 +89,12 @@ public class ClubAdminResource {
     public Response removePhoto(@PathParam("clubId") long clubId, @PathParam("photoId") long photoId) {
         clubAdminService.removePhoto(clubId, photoId);
         return Response.noContent().build();
+    }
+
+    @GET
+    @Path("/admins")
+    public ClubAdminsResponse listAdmins(@PathParam("clubId") long clubId) {
+        return clubAdminService.listAdmins(clubId);
     }
 
     @POST
