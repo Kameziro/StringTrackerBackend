@@ -14,6 +14,15 @@ import java.util.Set;
 @ApplicationScoped
 public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
 
+    /** Horários do clube que começam entre {@code from} (inclusive) e {@code until} (exclusivo), sem os removidos. */
+    public List<LessonSlot> listOfClub(long clubId, Instant from, Instant until) {
+        return list("""
+                        clubCoach.club.id = ?1 and startsAt >= ?2 and startsAt < ?3
+                        and status <> ?4 and active = true order by startsAt
+                        """,
+                clubId, from, until, LessonSlotStatus.REMOVED);
+    }
+
     /** Inícios dos horários do bloco entre {@code from} (inclusive) e {@code until} (exclusivo), em qualquer status. */
     public Set<Instant> startsAtOfBlock(long blockId, Instant from, Instant until) {
         return new HashSet<>(getEntityManager().createQuery("""
