@@ -7,10 +7,24 @@ import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
+
+    /** Inícios dos horários do bloco entre {@code from} (inclusive) e {@code until} (exclusivo), em qualquer status. */
+    public Set<Instant> startsAtOfBlock(long blockId, Instant from, Instant until) {
+        return new HashSet<>(getEntityManager().createQuery("""
+                        select s.startsAt from LessonSlot s
+                        where s.scheduleBlock.id = :blockId and s.startsAt >= :from and s.startsAt < :until
+                        """, Instant.class)
+                .setParameter("blockId", blockId)
+                .setParameter("from", from)
+                .setParameter("until", until)
+                .getResultList());
+    }
 
     /**
      * Marca como removidos os horários do bloco que ainda não começaram e não têm reserva ativa

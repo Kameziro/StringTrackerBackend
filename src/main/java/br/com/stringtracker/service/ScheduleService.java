@@ -8,6 +8,7 @@ import br.com.stringtracker.model.schedule.LessonKind;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.ScheduleBlock;
 import br.com.stringtracker.repository.ClubCoachRepository;
+import br.com.stringtracker.repository.DayBlockRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.ScheduleBlockRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.Set;
 
 /**
  * Blocos semanais de aula particular e a geração dos horários concretos numa janela móvel de 28 dias.
@@ -35,7 +37,7 @@ import java.time.temporal.TemporalAdjusters;
 @ApplicationScoped
 public class ScheduleService {
 
-    public static final int WINDOW_DAYS = 28;
+    private static final int WINDOW_DAYS = 28;
 
     private static final String EXCLUSION_VIOLATION = "23P01";
     private static final short PRIVATE_CAPACITY = 1;
@@ -53,6 +55,9 @@ public class ScheduleService {
     LessonSlotRepository lessonSlotRepository;
 
     @Inject
+    DayBlockRepository dayBlockRepository;
+
+    @Inject
     Clock clock;
 
     @Transactional
@@ -67,9 +72,7 @@ public class ScheduleService {
         ScheduleBlock block = ScheduleBlock.create(link, LessonKind.PRIVATE, (short) request.dayOfWeek(),
                 request.startTime(), request.endTime(), (short) request.durationMinutes(), PRIVATE_CAPACITY);
         scheduleBlockRepository.persist(block);
-        LocalDate today = LocalDate.now(clock);
-        int created = generateSlots(block, today, today.plusDays(WINDOW_DAYS));
-        return ScheduleBlockResponse.from(block, created);
+        return ScheduleBlockResponse.from(block, generateSlots(block));
     }
 
     /**
@@ -88,13 +91,26 @@ public class ScheduleService {
         lessonSlotRepository.removeFutureWithoutBooking(blockId, clock.instant());
     }
 
+    /** Estende o bloco ativo até o fim da janela de 28 dias, sem repetir horários. Devolve quantos criou. */
+    @Transactional
+    public int extendBlock(long blockId) {
+        return scheduleBlockRepository.findActiveById(blockId).map(this::generateSlots).orElse(0);
+    }
+
     /**
-     * Cria os horários do bloco nos dias de {@code from} (inclusive) até {@code until} (exclusivo) que caem no
-     * dia da semana dele, ignorando os que já começaram. Sobreposição com outro horário do professor, em qualquer
-     * clube, desfaz a transação inteira com {@link SlotConflictException}.
+     * Cria os horários do bloco nos próximos {@value #WINDOW_DAYS} dias (a partir de hoje) que caem no
+     * dia da semana dele, ignorando os que já começaram, os que já existem e os dias bloqueados do professor.
+     * Sobreposição com outro horário do professor, em qualquer clube, desfaz a transação inteira com
+     * {@link SlotConflictException}.
      */
-    int generateSlots(ScheduleBlock block, LocalDate from, LocalDate until) {
+    private int generateSlots(ScheduleBlock block) {
         Instant now = clock.instant();
+        LocalDate from = LocalDate.now(clock);
+        LocalDate until = from.plusDays(WINDOW_DAYS);
+        Set<Instant> existing = lessonSlotRepository.startsAtOfBlock(block.getId(),
+                from.atStartOfDay(clock.getZone()).toInstant(), until.atStartOfDay(clock.getZone()).toInstant());
+        Set<LocalDate> blockedDays = dayBlockRepository.blockedDays(block.getClubCoach().getCoach().getId(),
+                block.getClubCoach().getClub().getId(), from, until);
         Duration lesson = Duration.ofMinutes(block.getDurationMinutes());
         int created = 0;
         try {
@@ -103,7 +119,7 @@ public class ScheduleService {
                 for (LocalTime start = block.getStartTime(); fits(start, lesson, block.getEndTime());
                      start = start.plus(lesson)) {
                     Instant startsAt = ZonedDateTime.of(day, start, clock.getZone()).toInstant();
-                    if (startsAt.isAfter(now)) {
+                    if (startsAt.isAfter(now) && !existing.contains(startsAt) && !blockedDays.contains(day)) {
                         lessonSlotRepository.persist(LessonSlot.create(block, block.getClubCoach(), startsAt,
                                 startsAt.plus(lesson), block.getKind(), block.getCapacity()));
                         created++;
