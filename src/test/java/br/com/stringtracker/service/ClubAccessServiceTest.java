@@ -32,6 +32,8 @@ class ClubAccessServiceTest {
     private static final String ADMIN_A = "kc-access-admin-a";
     private static final String COACH = "kc-access-coach";
     private static final String COMMON = "kc-access-common";
+    private static final String FORMER_ADMIN = "kc-access-former-admin";
+    private static final String FORMER_COACH = "kc-access-former-coach";
 
     @Inject
     ClubAccessService access;
@@ -51,6 +53,7 @@ class ClubAccessServiceTest {
     private long clubAId;
     private long clubBId;
     private long coachId;
+    private long formerCoachId;
 
     @BeforeEach
     void seed() {
@@ -60,6 +63,8 @@ class ClubAccessServiceTest {
             User adminA = user(ADMIN_A);
             User coachUser = user(COACH);
             user(COMMON);
+            User formerAdmin = user(FORMER_ADMIN);
+            User formerCoach = user(FORMER_COACH);
 
             Club clubA = clubRepository.findOrCreateByName("Acesso Clube A");
             Club clubB = clubRepository.findOrCreateByName("Acesso Clube B");
@@ -76,6 +81,20 @@ class ClubAccessServiceTest {
                         return created;
                     });
             coachId = coach.getId();
+
+            if (clubAdminRepository.count("club = ?1 and user = ?2", clubA, formerAdmin) == 0) {
+                ClubAdmin link = ClubAdmin.create(clubA, formerAdmin);
+                link.markExcluded();
+                clubAdminRepository.persist(link);
+            }
+            Coach former = coachRepository.find("user", formerCoach).firstResultOptional()
+                    .orElseGet(() -> {
+                        Coach created = Coach.create(formerCoach);
+                        created.markExcluded();
+                        coachRepository.persist(created);
+                        return created;
+                    });
+            formerCoachId = former.getId();
         });
     }
 
@@ -172,5 +191,20 @@ class ClubAccessServiceTest {
     @JwtSecurity(claims = {@Claim(key = "sub", value = COMMON)})
     void adminClubIds_isEmptyForACommonUser() {
         assertTrue(access.adminClubIds().isEmpty());
+    }
+
+    @Test
+    @TestSecurity(user = FORMER_ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = FORMER_ADMIN)})
+    void clubAdmin_whoseLinkWasDeactivated_isDenied() {
+        assertThrows(ForbiddenException.class, () -> access.requireClubAdmin(clubAId));
+        assertTrue(access.adminClubIds().isEmpty());
+    }
+
+    @Test
+    @TestSecurity(user = FORMER_COACH)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = FORMER_COACH)})
+    void coach_whoseProfileWasDeactivated_isDenied() {
+        assertThrows(ForbiddenException.class, () -> access.requireCoach(formerCoachId));
     }
 }

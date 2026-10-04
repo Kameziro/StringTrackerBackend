@@ -10,7 +10,7 @@ import java.util.Optional;
 public class CoachRepository implements PanacheRepository<Coach> {
 
     public boolean existsByIdAndUserId(long coachId, long userId) {
-        return count("id = ?1 and user.id = ?2", coachId, userId) > 0;
+        return count("id = ?1 and user.id = ?2 and active = true", coachId, userId) > 0;
     }
 
     public Optional<Coach> findByUserId(long userId) {

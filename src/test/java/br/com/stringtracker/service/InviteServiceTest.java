@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -227,6 +228,50 @@ class InviteServiceTest {
         assertEquals(coachIdAfterFirst, coachRepository.findByUserId(guestId).orElseThrow().getId());
         assertTrue(clubCoachRepository.findByClubAndCoach(clubA, coachIdAfterFirst).isPresent());
         assertTrue(clubCoachRepository.findByClubAndCoach(clubB, coachIdAfterFirst).isPresent());
+    }
+
+    @Test
+    @TestSecurity(user = GUEST)
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = GUEST),
+            @Claim(key = "email", value = GUEST_EMAIL),
+            @Claim(key = "name", value = "Guest")
+    })
+    void reinvitingACoachWhoWasUnlinked_reactivatesTheOldLinkInsteadOfLeavingItInactive() {
+        long clubId = newClub();
+        invites.accept(seedInvite(InviteKind.COACH, clubId, GUEST_EMAIL, Instant.now().plus(Duration.ofDays(1))));
+        long guestId = userRepository.findByKeycloakId(GUEST).orElseThrow().getId();
+        long coachId = coachRepository.findByUserId(guestId).orElseThrow().getId();
+        QuarkusTransaction.requiringNew().run(() ->
+                clubCoachRepository.findByClubAndCoach(clubId, coachId).orElseThrow().markExcluded());
+
+        invites.accept(seedInvite(InviteKind.COACH, clubId, GUEST_EMAIL, Instant.now().plus(Duration.ofDays(1))));
+
+        assertEquals(1, clubCoachRepository.count("club.id = ?1 and coach.id = ?2", clubId, coachId));
+        var link = clubCoachRepository.findByClubAndCoach(clubId, coachId).orElseThrow();
+        assertTrue(link.isActive());
+        assertNull(link.getExclusionDate());
+    }
+
+    @Test
+    @TestSecurity(user = GUEST)
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = GUEST),
+            @Claim(key = "email", value = GUEST_EMAIL),
+            @Claim(key = "name", value = "Guest")
+    })
+    void reinvitingAnAdminWhoWasRemoved_reactivatesTheOldLink() {
+        long clubId = newClub();
+        invites.accept(seedInvite(InviteKind.CLUB_ADMIN, clubId, GUEST_EMAIL, Instant.now().plus(Duration.ofDays(1))));
+        long guestId = userRepository.findByKeycloakId(GUEST).orElseThrow().getId();
+        QuarkusTransaction.requiringNew().run(() ->
+                clubAdminRepository.findLink(clubId, guestId).orElseThrow().markExcluded());
+        assertFalse(clubAdminRepository.isAdmin(clubId, guestId));
+
+        invites.accept(seedInvite(InviteKind.CLUB_ADMIN, clubId, GUEST_EMAIL, Instant.now().plus(Duration.ofDays(1))));
+
+        assertTrue(clubAdminRepository.isAdmin(clubId, guestId));
+        assertEquals(1, clubAdminRepository.count("club.id = ?1 and user.id = ?2", clubId, guestId));
     }
 
     @Test

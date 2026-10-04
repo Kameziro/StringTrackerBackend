@@ -124,9 +124,9 @@ public class InviteService {
     }
 
     private void linkAdmin(Club club, User user) {
-        if (!clubAdminRepository.isAdmin(club.getId(), user.getId())) {
-            clubAdminRepository.persist(ClubAdmin.create(club, user));
-        }
+        clubAdminRepository.findLink(club.getId(), user.getId()).ifPresentOrElse(
+                ClubAdmin::reactivate,
+                () -> clubAdminRepository.persist(ClubAdmin.create(club, user)));
     }
 
     private void linkCoach(Club club, User user) {
@@ -135,9 +135,10 @@ public class InviteService {
             coachRepository.persist(created);
             return created;
         });
-        if (clubCoachRepository.findByClubAndCoach(club.getId(), coach.getId()).isEmpty()) {
-            clubCoachRepository.persist(ClubCoach.create(club, coach));
-        }
+        // Reconvite depois de desvincular: reativa o vínculo antigo, a restrição única impede um segundo.
+        clubCoachRepository.findByClubAndCoach(club.getId(), coach.getId()).ifPresentOrElse(
+                ClubCoach::reactivate,
+                () -> clubCoachRepository.persist(ClubCoach.create(club, coach)));
     }
 
     private static Invite orNotFound(Optional<Invite> invite) {

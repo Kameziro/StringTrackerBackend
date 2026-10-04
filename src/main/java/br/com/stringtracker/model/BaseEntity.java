@@ -9,16 +9,15 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 
 /**
  * Campos comuns a todas as entidades persistidas (soft-delete + auditoria).
- * {@link SQLRestriction} aplica filtro {@code active = true} em todas as queries.
+ * Nenhuma query filtra {@code active} sozinha (o Hibernate ignora {@code @SQLRestriction} numa
+ * {@code @MappedSuperclass}): toda consulta que deve ver só registros ativos escreve {@code active = true}.
  */
 @MappedSuperclass
-@SQLRestriction("active = true")
 @Getter
 @Setter
 public abstract class BaseEntity {
@@ -57,5 +56,11 @@ public abstract class BaseEntity {
     public void markExcluded() {
         this.active = false;
         this.exclusionDate = Instant.now();
+    }
+
+    /** Desfaz o soft-delete. */
+    public void reactivate() {
+        this.active = true;
+        this.exclusionDate = null;
     }
 }
