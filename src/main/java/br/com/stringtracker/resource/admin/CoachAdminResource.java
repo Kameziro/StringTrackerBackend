@@ -4,6 +4,7 @@ import br.com.stringtracker.dto.CoachPricesResponse;
 import br.com.stringtracker.dto.CreateScheduleBlockRequest;
 import br.com.stringtracker.dto.DayBlockRequest;
 import br.com.stringtracker.dto.DayBlockResponse;
+import br.com.stringtracker.dto.UnlinkCoachResponse;
 import br.com.stringtracker.dto.UpdateCoachPricesRequest;
 import br.com.stringtracker.service.CoachService;
 import br.com.stringtracker.service.DayBlockService;
@@ -12,11 +13,13 @@ import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -66,5 +69,15 @@ public class CoachAdminResource {
             @Valid DayBlockRequest request
     ) {
         return dayBlockService.blockForClub(clubId, coachId, request);
+    }
+
+    @DELETE
+    @Path("/{coachId}")
+    public UnlinkCoachResponse unlink(
+            @PathParam("clubId") long clubId,
+            @PathParam("coachId") long coachId,
+            @QueryParam("confirm") boolean confirm
+    ) {
+        return coachService.unlink(clubId, coachId, confirm);
     }
 }

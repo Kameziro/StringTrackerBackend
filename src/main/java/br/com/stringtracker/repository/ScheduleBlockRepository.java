@@ -22,4 +22,8 @@ public class ScheduleBlockRepository implements PanacheRepository<ScheduleBlock>
     public Optional<ScheduleBlock> findActiveById(long id) {
         return find("id = ?1 and active = true", id).firstResultOptional();
     }
+
+    public List<ScheduleBlock> listActiveOfLink(long clubCoachId) {
+        return list("clubCoach.id = ?1 and active = true", clubCoachId);
+    }
 }

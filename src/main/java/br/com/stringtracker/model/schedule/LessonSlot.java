@@ -16,6 +16,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Ocorrência concreta de aula. O banco impede que o mesmo professor tenha dois slots
@@ -57,6 +59,10 @@ public class LessonSlot extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private LessonSlotStatus status = LessonSlotStatus.OPEN;
+
+    public static List<Long> idsOf(Collection<LessonSlot> slots) {
+        return slots.stream().map(LessonSlot::getId).toList();
+    }
 
     public static LessonSlot create(ScheduleBlock scheduleBlock, ClubCoach clubCoach, Instant startsAt,
                                     Instant endsAt, LessonKind kind, short capacity) {

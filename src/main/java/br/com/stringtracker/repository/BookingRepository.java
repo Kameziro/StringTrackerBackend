@@ -52,14 +52,27 @@ public class BookingRepository implements PanacheRepository<Booking> {
                 .withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
     }
 
-    public Optional<Booking> findActiveById(long bookingId) {
-        return find("id = ?1 and active = true", bookingId).firstResultOptional();
-    }
-
     /** Reserva ativa travada até o fim da transação: é o lock do agregado antes de mexer no pagamento. */
     public Optional<Booking> findActiveForUpdate(long bookingId) {
         return find("id = ?1 and active = true", bookingId)
                 .withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
+    }
+
+    /** Reservas ativas (seguradas ou confirmadas) dos horários dados, com horário, clube e aluno, na ordem de criação. */
+    public List<Booking> listActiveOfSlots(Collection<Long> slotIds) {
+        if (slotIds.isEmpty()) {
+            return List.of();
+        }
+        return getEntityManager().createQuery("""
+                        select b from Booking b
+                        join fetch b.lessonSlot s join fetch s.clubCoach cc join fetch cc.club
+                        left join fetch b.studentUser
+                        where s.id in :slotIds and b.active = true and b.status in :activeStatuses
+                        order by b.id
+                        """, Booking.class)
+                .setParameter("slotIds", slotIds)
+                .setParameter("activeStatuses", ACTIVE)
+                .getResultList();
     }
 
     /** Ids das reservas ativas (seguradas ou confirmadas) dos horários dados, na ordem em que foram criadas. */

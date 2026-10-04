@@ -1,5 +1,6 @@
 package br.com.stringtracker.service;
 
+import br.com.stringtracker.dto.AffectedBookingResponse;
 import br.com.stringtracker.dto.DayBlockRequest;
 import br.com.stringtracker.dto.DayBlockResponse;
 import br.com.stringtracker.model.Club;
@@ -24,7 +25,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Bloqueio de um dia do professor (AGND-04, PROFAPP-03). O admin bloqueia o dia só no clube dele; o professor, em
@@ -83,11 +83,7 @@ public class DayBlockService {
 
     private DayBlockResponse preview(Coach coach, Club club, LocalDate day) {
         List<LessonSlot> slots = upcomingSlots(coach, club, day, LockModeType.NONE);
-        List<Booking> affected = activeBookingIds(slots).stream()
-                .map(bookingRepository::findActiveById)
-                .flatMap(Optional::stream)
-                .toList();
-        return response(day, false, affected);
+        return response(day, false, bookingRepository.listActiveOfSlots(LessonSlot.idsOf(slots)));
     }
 
     private DayBlockResponse apply(Coach coach, Club club, LocalDate day) {
@@ -98,7 +94,8 @@ public class DayBlockService {
         if (!dayBlockRepository.exists(coach.getId(), idOf(club), day)) {
             dayBlockRepository.persist(DayBlock.create(coach, club, day, actor));
         }
-        return response(day, true, cancellationService.cancelAllWithFullRefund(activeBookingIds(slots), actor));
+        List<Long> bookingIds = bookingRepository.listActiveIdsOfSlots(LessonSlot.idsOf(slots));
+        return response(day, true, cancellationService.cancelAllWithFullRefund(bookingIds, actor));
     }
 
     /** Horários do dia que ainda não começaram, no clube dado ou em todos se for nulo. */
@@ -108,15 +105,11 @@ public class DayBlockService {
                 clock.instant(), lock);
     }
 
-    private List<Long> activeBookingIds(List<LessonSlot> slots) {
-        return bookingRepository.listActiveIdsOfSlots(slots.stream().map(LessonSlot::getId).toList());
-    }
-
     private static Long idOf(Club club) {
         return club == null ? null : club.getId();
     }
 
     private static DayBlockResponse response(LocalDate day, boolean applied, List<Booking> bookings) {
-        return new DayBlockResponse(day, applied, bookings.stream().map(DayBlockResponse.Affected::from).toList());
+        return new DayBlockResponse(day, applied, bookings.stream().map(AffectedBookingResponse::from).toList());
     }
 }

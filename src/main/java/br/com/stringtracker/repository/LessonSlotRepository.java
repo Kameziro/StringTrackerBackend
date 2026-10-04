@@ -58,6 +58,24 @@ public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
         return query.getResultList();
     }
 
+    /**
+     * Horários do vínculo que ainda não começaram, sem os removidos, por id. Com {@code lock} diferente de NONE as
+     * linhas ficam travadas até o fim da transação.
+     */
+    public List<LessonSlot> listUpcomingOfLink(long clubCoachId, Instant now, LockModeType lock) {
+        return getEntityManager().createQuery("""
+                        select s from LessonSlot s
+                        where s.clubCoach.id = :clubCoachId and s.startsAt > :now
+                          and s.status <> :removed and s.active = true
+                        order by s.id
+                        """, LessonSlot.class)
+                .setParameter("clubCoachId", clubCoachId)
+                .setParameter("now", now)
+                .setParameter("removed", LessonSlotStatus.REMOVED)
+                .setLockMode(lock)
+                .getResultList();
+    }
+
     /** Inícios dos horários do bloco entre {@code from} (inclusive) e {@code until} (exclusivo), em qualquer status. */
     public Set<Instant> startsAtOfBlock(long blockId, Instant from, Instant until) {
         return new HashSet<>(getEntityManager().createQuery("""
