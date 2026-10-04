@@ -29,7 +29,8 @@ import java.util.List;
  * Bloqueio de um dia do professor (AGND-04, PROFAPP-03). O admin bloqueia o dia só no clube dele; o professor, em
  * todos os clubes. Sem confirmação a chamada só lista as reservas afetadas; com confirmação os horários do dia ainda
  * por começar viram BLOCKED e as reservas deles são canceladas com reembolso integral. O dia fica registrado, e a
- * geração de horários passa a pulá-lo. A linha do professor é travada antes de mexer nos horários.
+ * geração de horários passa a pulá-lo. A linha do professor é travada antes de mexer nos horários. Quando é o admin
+ * que bloqueia, o professor recebe um único push com o total de reservas canceladas.
  */
 @ApplicationScoped
 public class DayBlockService {
@@ -56,6 +57,9 @@ public class DayBlockService {
     BookingCancellationService cancellationService;
 
     @Inject
+    LessonNotifier notifier;
+
+    @Inject
     Clock clock;
 
     @Transactional
@@ -64,7 +68,11 @@ public class DayBlockService {
         ClubCoach link = clubCoachRepository.findByClubAndCoach(clubId, coachId)
                 .filter(ClubCoach::isActive)
                 .orElseThrow(() -> new NotFoundException("Professor não vinculado a este clube"));
-        return block(link.getCoach(), link.getClub(), request);
+        DayBlockResponse response = block(link.getCoach(), link.getClub(), request);
+        if (response.applied()) {
+            notifier.coachDayBlockedByClub(link.getClub(), link.getCoach(), request.date(), response.affected().size());
+        }
+        return response;
     }
 
     @Transactional

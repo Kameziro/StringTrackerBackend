@@ -76,7 +76,10 @@ public class BookingCancellationService {
         if (booking.getLessonSlot().getClubCoach().getClub().getId() != clubId) {
             throw new ForbiddenException("Esta reserva é de outro clube");
         }
-        return cancelWithFullRefund(booking, admin);
+        if (cancelWithFullRefund(booking, admin)) {
+            notifier.coachBookingCancelledByClub(booking);
+        }
+        return BookingResponse.from(booking, null);
     }
 
     @Transactional
@@ -87,7 +90,8 @@ public class BookingCancellationService {
         if (!booking.getLessonSlot().getCoach().getId().equals(coach.getId())) {
             throw new ForbiddenException("Esta aula é de outro professor");
         }
-        return cancelWithFullRefund(booking, coach.getUser());
+        cancelWithFullRefund(booking, coach.getUser());
+        return BookingResponse.from(booking, null);
     }
 
     /**
@@ -128,22 +132,26 @@ public class BookingCancellationService {
         return cancelled;
     }
 
-    private BookingResponse cancelWithFullRefund(Booking booking, User actor) {
+    /** Devolve se a aula estava confirmada, o que decide se o professor também precisa ser avisado. */
+    private boolean cancelWithFullRefund(Booking booking, User actor) {
         if (!booking.getStatus().holdsSeat()) {
             throw new BusinessRuleException("Esta reserva não pode ser cancelada");
         }
         requireNotStarted(booking);
-        cancelByStaff(booking, actor);
-        return BookingResponse.from(booking, null);
+        return cancelByStaff(booking, actor);
     }
 
-    /** Cancelamento do clube ou do professor: reembolso integral e aviso ao aluno que tinha a aula confirmada. */
-    private void cancelByStaff(Booking booking, User actor) {
+    /**
+     * Cancelamento do clube ou do professor: reembolso integral e aviso ao aluno que tinha a aula confirmada.
+     * Devolve se ela estava confirmada.
+     */
+    private boolean cancelByStaff(Booking booking, User actor) {
         boolean wasConfirmed = booking.getStatus() == BookingStatus.CONFIRMED;
         cancel(booking, actor, true);
         if (wasConfirmed) {
             notifier.bookingCancelledByStaff(booking);
         }
+        return wasConfirmed;
     }
 
     private void requireNotStarted(Booking booking) {

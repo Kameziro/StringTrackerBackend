@@ -61,7 +61,9 @@ public class ManualBookingService {
         if (slot.getClubCoach().getClub().getId() != clubId) {
             throw new ForbiddenException("Este horário é de outro clube");
         }
-        return create(slot, student, request);
+        Booking booking = create(slot, student, request);
+        notifier.coachNewBookingByClub(booking);
+        return BookingResponse.from(booking, null);
     }
 
     @Transactional
@@ -72,10 +74,11 @@ public class ManualBookingService {
         if (!slot.getCoach().getId().equals(coach.getId())) {
             throw new ForbiddenException("Este horário é de outro professor");
         }
-        return create(slot, student, request);
+        return BookingResponse.from(create(slot, student, request), null);
     }
 
-    private BookingResponse create(LessonSlot slot, Student student, CreateManualBookingRequest request) {
+    /** Cria a reserva e avisa o aluno com conta; avisar o professor cabe a quem sabe que foi outro a criá-la. */
+    private Booking create(LessonSlot slot, Student student, CreateManualBookingRequest request) {
         if (slot.getStatus() == LessonSlotStatus.BLOCKED) {
             throw new SlotConflictException(SLOT_TAKEN);
         }
@@ -97,7 +100,7 @@ public class ManualBookingService {
         }
         seatService.persist(booking, SLOT_TAKEN);
         notifier.bookingConfirmed(booking);
-        return BookingResponse.from(booking, null);
+        return booking;
     }
 
     private Student resolveStudent(CreateManualBookingRequest request) {

@@ -203,7 +203,7 @@ class LessonNotifierTest {
     @Test
     @TestSecurity(user = ADMIN)
     @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
-    void adminCancelling_tellsTheStudentAboutTheRefund_andNeitherTheAdminNorTheCoachGetsAPush() {
+    void adminCancelling_tellsTheStudentAboutTheRefundAndTheCoachAboutTheCancellation_butNeverTheAdmin() {
         long bookingId = pixBooking(BookingStatus.CONFIRMED, PaymentStatus.APPROVED, STUDENT);
 
         given().when().post("/api/admin/clubs/" + clubId + "/bookings/" + bookingId + "/cancel")
@@ -212,7 +212,22 @@ class LessonNotifierTest {
         verify(push).notifyUser(studentId, "Aula cancelada",
                 "Sua aula com " + coachName() + " de " + WHEN + " foi cancelada. O valor de R$ 90,00 foi devolvido.",
                 data("lesson_cancelled", bookingId));
+        verify(push).notifyUser(coachUserId, "Aula cancelada pelo clube",
+                "A aula de " + WHEN + " com " + STUDENT + " foi cancelada pelo clube.",
+                data("coach_booking_cancelled", bookingId));
         verifyNoMoreInteractions(push);
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void adminCancellingAHeldBooking_tellsNobody_becauseTheCoachNeverSawIt() {
+        long bookingId = pixBooking(BookingStatus.HELD, PaymentStatus.PENDING, STUDENT);
+
+        given().when().post("/api/admin/clubs/" + clubId + "/bookings/" + bookingId + "/cancel")
+                .then().statusCode(200);
+
+        verify(push, never()).notifyUser(anyLong(), anyString(), anyString(), anyMap());
     }
 
     @Test
@@ -261,7 +276,7 @@ class LessonNotifierTest {
     @Test
     @TestSecurity(user = ADMIN)
     @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
-    void manualBookingWithAnAccount_tellsTheStudent_andOneForAGuestTellsNobody() {
+    void adminManualBooking_tellsTheCoachAndTheStudentWithAnAccount_butForAGuestOnlyTheCoach() {
         long slotForAccount = QuarkusTransaction.requiringNew().call(() -> nextSlot().getId());
         long slotForGuest = QuarkusTransaction.requiringNew().call(() -> nextSlot().getId());
 
@@ -269,13 +284,69 @@ class LessonNotifierTest {
                 .body("{\"slotId\":%d,\"type\":\"SINGLES\",\"studentUserId\":%d}".formatted(slotForAccount, studentId))
                 .when().post("/api/admin/clubs/" + clubId + "/bookings")
                 .then().statusCode(201).extract().jsonPath().getLong("bookingId");
-        given().contentType(ContentType.JSON)
+        long guestBooking = given().contentType(ContentType.JSON)
                 .body("{\"slotId\":%d,\"type\":\"SINGLES\",\"guestName\":\"Ana\",\"guestPhone\":\"98999990000\"}"
                         .formatted(slotForGuest))
-                .when().post("/api/admin/clubs/" + clubId + "/bookings").then().statusCode(201);
+                .when().post("/api/admin/clubs/" + clubId + "/bookings")
+                .then().statusCode(201).extract().jsonPath().getLong("bookingId");
 
         verify(push).notifyUser(eq(studentId), eq("Aula confirmada"), anyString(),
                 eq(data("lesson_confirmed", accountBooking)));
+        verify(push).notifyUser(coachUserId, "Nova aula reservada pelo clube",
+                STUDENT + " · 07/10 às 10:00 · " + clubName, data("coach_booking", accountBooking));
+        verify(push).notifyUser(coachUserId, "Nova aula reservada pelo clube",
+                "Ana · 07/10 às 12:00 · " + clubName, data("coach_booking", guestBooking));
+        verifyNoMoreInteractions(push);
+    }
+
+    @Test
+    @TestSecurity(user = COACH)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = COACH)})
+    void coachManualBooking_tellsTheStudentButNotTheCoachWhoDidIt() {
+        long slotId = QuarkusTransaction.requiringNew().call(() -> nextSlot().getId());
+
+        long bookingId = given().contentType(ContentType.JSON)
+                .body("{\"slotId\":%d,\"type\":\"SINGLES\",\"studentUserId\":%d}".formatted(slotId, studentId))
+                .when().post("/api/coach/me/bookings")
+                .then().statusCode(201).extract().jsonPath().getLong("bookingId");
+
+        verify(push).notifyUser(eq(studentId), eq("Aula confirmada"), anyString(),
+                eq(data("lesson_confirmed", bookingId)));
+        verifyNoMoreInteractions(push);
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void adminBlockingADay_tellsTheCoachOnceWithTheCancelledCount_andEachConfirmedStudent() {
+        long first = pixBooking(BookingStatus.CONFIRMED, PaymentStatus.APPROVED, STUDENT);
+        pixBooking(BookingStatus.CONFIRMED, PaymentStatus.APPROVED, OTHER_STUDENT);
+
+        given().contentType(ContentType.JSON).body("{\"date\":\"2026-10-07\",\"confirm\":true}")
+                .when().post("/api/admin/clubs/" + clubId + "/coaches/" + coachId + "/day-blocks")
+                .then().statusCode(200);
+
+        verify(push).notifyUser(coachUserId, "Dia bloqueado pelo clube",
+                clubName + " bloqueou 07/10 na sua agenda. 2 reservas foram canceladas.",
+                Map.of("type", "coach_day_blocked", "date", "2026-10-07"));
+        verify(push).notifyUser(eq(studentId), eq("Aula cancelada"), anyString(), eq(data("lesson_cancelled", first)));
+        verify(push).notifyUser(eq(otherStudentId), eq("Aula cancelada"), anyString(), anyMap());
+        verifyNoMoreInteractions(push);
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void adminBlockingADayWithoutBookings_stillTellsTheCoach_butAPreviewTellsNobody() {
+        String url = "/api/admin/clubs/" + clubId + "/coaches/" + coachId + "/day-blocks";
+
+        given().contentType(ContentType.JSON).body("{\"date\":\"2026-10-07\"}").when().post(url).then().statusCode(200);
+        verify(push, never()).notifyUser(anyLong(), anyString(), anyString(), anyMap());
+
+        given().contentType(ContentType.JSON).body("{\"date\":\"2026-10-07\",\"confirm\":true}")
+                .when().post(url).then().statusCode(200);
+        verify(push).notifyUser(coachUserId, "Dia bloqueado pelo clube",
+                clubName + " bloqueou 07/10 na sua agenda.", Map.of("type", "coach_day_blocked", "date", "2026-10-07"));
         verifyNoMoreInteractions(push);
     }
 
@@ -295,14 +366,16 @@ class LessonNotifierTest {
     @Test
     @TestSecurity(user = ADMIN)
     @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
-    void aGuestBookingCancelled_sendsNoPushAndStillCancels() {
+    void aGuestBookingCancelled_stillCancels_andOnlyTheCoachGetsAPush() {
         long bookingId = QuarkusTransaction.requiringNew().call(() ->
                 fixtures.booking(nextSlot(), BookingStatus.CONFIRMED, fixtures.user(ADMIN)).getId());
 
         given().when().post("/api/admin/clubs/" + clubId + "/bookings/" + bookingId + "/cancel")
                 .then().statusCode(200).body("status", org.hamcrest.Matchers.equalTo("CANCELLED"));
 
-        verify(push, never()).notifyUser(anyLong(), anyString(), anyString(), anyMap());
+        verify(push).notifyUser(eq(coachUserId), eq("Aula cancelada pelo clube"), anyString(),
+                eq(data("coach_booking_cancelled", bookingId)));
+        verifyNoMoreInteractions(push);
     }
 
     @Test

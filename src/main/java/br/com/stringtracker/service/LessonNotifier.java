@@ -1,5 +1,7 @@
 package br.com.stringtracker.service;
 
+import br.com.stringtracker.model.Club;
+import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.model.User;
 import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.LessonSlot;
@@ -12,16 +14,18 @@ import jakarta.transaction.Synchronization;
 import jakarta.transaction.TransactionSynchronizationRegistry;
 import org.jboss.logging.Logger;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * Pushes da agenda de professores (NOTIF-01..04). O aluno recebe a confirmação e o cancelamento da aula, o professor
- * recebe a reserva e o cancelamento feitos pelo aluno, e admins do clube nunca recebem (NOTIF-04). O push sai depois
- * do commit, para não avisar de algo que acabou desfeito, e uma falha dele é só registrada: o estado da aula não muda.
- * Aluno convidado, sem conta, não tem push. As mensagens são montadas na hora da chamada, enquanto a reserva ainda
- * está carregada, e só o envio fica para depois do commit.
+ * Pushes da agenda de professores (NOTIF-01..04). O aluno recebe a confirmação e o cancelamento da aula; o professor
+ * recebe a reserva, o cancelamento e o bloqueio de dia feitos pelo aluno ou pelo admin do clube (o que o próprio
+ * professor faz não o avisa, e desvincular o professor também não); admins do clube nunca recebem (NOTIF-04). O push
+ * sai depois do commit, para não avisar de algo que acabou desfeito, e uma falha dele é só
+ * registrada: o estado da aula não muda. Aluno convidado, sem conta, não tem push. As mensagens são montadas na hora
+ * da chamada, enquanto a reserva ainda está carregada, e só o envio fica para depois do commit.
  */
 @ApplicationScoped
 public class LessonNotifier {
@@ -30,6 +34,7 @@ public class LessonNotifier {
     private static final Locale PT_BR = Locale.of("pt", "BR");
     private static final DateTimeFormatter WHEN =
             DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm", PT_BR).withZone(ClockProducer.ZONE);
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM", PT_BR);
 
     @Inject
     ExpoPushService push;
@@ -69,9 +74,12 @@ public class LessonNotifier {
 
     /** Pix do aluno confirmado: o professor ganhou uma aula (NOTIF-03). */
     public void coachNewBooking(Booking booking) {
-        LessonSlot slot = booking.getLessonSlot();
-        toCoach(booking, "coach_booking", "Nova aula reservada", "%s · %s · %s".formatted(
-                booking.studentName(), when(slot), slot.getClubCoach().getClub().getName()));
+        toCoach(booking, "coach_booking", "Nova aula reservada", bookingSummary(booking));
+    }
+
+    /** O admin do clube registrou uma reserva manual numa aula do professor (NOTIF-03). */
+    public void coachNewBookingByClub(Booking booking) {
+        toCoach(booking, "coach_booking", "Nova aula reservada pelo clube", bookingSummary(booking));
     }
 
     /** O aluno cancelou a aula (NOTIF-03). */
@@ -80,30 +88,59 @@ public class LessonNotifier {
                 booking.studentName(), when(booking.getLessonSlot())));
     }
 
+    /** O admin do clube cancelou uma aula confirmada do professor (NOTIF-03). */
+    public void coachBookingCancelledByClub(Booking booking) {
+        toCoach(booking, "coach_booking_cancelled", "Aula cancelada pelo clube",
+                "A aula de %s com %s foi cancelada pelo clube.".formatted(
+                        when(booking.getLessonSlot()), booking.studentName()));
+    }
+
+    /**
+     * O admin do clube bloqueou um dia do professor (NOTIF-03): um único aviso por bloqueio, com quantas reservas
+     * ele cancelou, em vez de um push por reserva.
+     */
+    public void coachDayBlockedByClub(Club club, Coach coach, LocalDate day, int cancelledBookings) {
+        String cancelled = switch (cancelledBookings) {
+            case 0 -> "";
+            case 1 -> " 1 reserva foi cancelada.";
+            default -> " %d reservas foram canceladas.".formatted(cancelledBookings);
+        };
+        send(club.getId(), coach.getUser(), Map.of("type", "coach_day_blocked", "date", day.toString()),
+                "Dia bloqueado pelo clube",
+                "%s bloqueou %s na sua agenda.%s".formatted(club.getName(), DAY.format(day), cancelled));
+    }
+
     private void toStudent(Booking booking, String type, String title, String body) {
-        send(booking, booking.getStudentUser(), type, title, body);
+        send(clubIdOf(booking), booking.getStudentUser(), bookingData(booking, type), title, body);
     }
 
     private void toCoach(Booking booking, String type, String title, String body) {
-        send(booking, booking.getLessonSlot().getCoach().getUser(), type, title, body);
+        send(clubIdOf(booking), booking.getLessonSlot().getCoach().getUser(), bookingData(booking, type), title, body);
     }
 
-    private void send(Booking booking, User recipient, String type, String title, String body) {
+    private void send(long clubId, User recipient, Map<String, Object> data, String title, String body) {
         try {
-            if (recipient == null || isAdminOfTheClub(booking, recipient)) {
+            if (recipient == null || clubAdminRepository.isAdmin(clubId, recipient.getId())) {
                 return;
             }
             long recipientId = recipient.getId();
-            Map<String, Object> data = Map.of("type", type, "bookingId", String.valueOf(booking.getId()));
             afterCommit(() -> push.notifyUser(recipientId, title, body, data));
         } catch (RuntimeException e) {
-            LOG.warnf(e, "Push %s da reserva %d não foi preparado", type, booking.getId());
+            LOG.warnf(e, "Push %s não foi preparado", data);
         }
     }
 
-    private boolean isAdminOfTheClub(Booking booking, User user) {
-        long clubId = booking.getLessonSlot().getClubCoach().getClub().getId();
-        return clubAdminRepository.isAdmin(clubId, user.getId());
+    private static Map<String, Object> bookingData(Booking booking, String type) {
+        return Map.of("type", type, "bookingId", String.valueOf(booking.getId()));
+    }
+
+    private static long clubIdOf(Booking booking) {
+        return booking.getLessonSlot().getClubCoach().getClub().getId();
+    }
+
+    private static String bookingSummary(Booking booking) {
+        LessonSlot slot = booking.getLessonSlot();
+        return "%s · %s · %s".formatted(booking.studentName(), when(slot), slot.getClubCoach().getClub().getName());
     }
 
     /** Executa o envio depois do commit; sem transação em curso, executa na hora. */
