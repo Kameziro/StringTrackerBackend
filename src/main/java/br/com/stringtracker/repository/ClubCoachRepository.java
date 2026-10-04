@@ -26,6 +26,11 @@ public class ClubCoachRepository implements PanacheRepository<ClubCoach> {
                 """, coachId);
     }
 
+    /** O usuário é professor ativo com ao menos um vínculo ativo com clube ativo. */
+    public boolean existsActiveOfUser(long userId) {
+        return count("coach.user.id = ?1 and coach.active = true and active = true and club.active = true", userId) > 0;
+    }
+
     /** Vínculo ativo ou não: a restrição única (club_id, coach_id) vale para os dois. */
     public Optional<ClubCoach> findByClubAndCoach(long clubId, long coachId) {
         return find("club.id = ?1 and coach.id = ?2", clubId, coachId).firstResultOptional();

@@ -1,5 +1,6 @@
 package br.com.stringtracker.repository;
 
+import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubAdmin;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,6 +29,14 @@ public class ClubAdminRepository implements PanacheRepository<ClubAdmin> {
                 select a from ClubAdmin a join fetch a.user u
                 where a.club.id = ?1 and a.active = true order by u.name, a.id
                 """, clubId);
+    }
+
+    /** Clubes ativos que o usuário administra, por nome. */
+    public List<Club> listActiveClubsOfUser(long userId) {
+        return list("""
+                select a from ClubAdmin a join fetch a.club c
+                where a.user.id = ?1 and a.active = true and c.active = true order by c.name, c.id
+                """, userId).stream().map(ClubAdmin::getClub).toList();
     }
 
     public Set<Long> findClubIdsByUserId(long userId) {
