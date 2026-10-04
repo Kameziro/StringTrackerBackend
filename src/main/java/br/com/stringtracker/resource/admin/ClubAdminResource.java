@@ -1,9 +1,11 @@
 package br.com.stringtracker.resource.admin;
 
 import br.com.stringtracker.dto.ClubProfileResponse;
+import br.com.stringtracker.dto.ConnectUrlResponse;
 import br.com.stringtracker.dto.InviteRequest;
 import br.com.stringtracker.dto.UpdateClubProfileRequest;
 import br.com.stringtracker.service.ClubAdminService;
+import br.com.stringtracker.service.PaymentAccountService;
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -29,6 +31,9 @@ public class ClubAdminResource {
     @Inject
     ClubAdminService clubAdminService;
 
+    @Inject
+    PaymentAccountService paymentAccountService;
+
     @GET
     @Path("/profile")
     public ClubProfileResponse getProfile(@PathParam("clubId") long clubId) {
@@ -42,6 +47,12 @@ public class ClubAdminResource {
             @Valid UpdateClubProfileRequest request
     ) {
         return clubAdminService.updateProfile(clubId, request);
+    }
+
+    @GET
+    @Path("/payment-account/connect-url")
+    public ConnectUrlResponse connectUrl(@PathParam("clubId") long clubId) {
+        return paymentAccountService.connectUrl(clubId);
     }
 
     @POST
