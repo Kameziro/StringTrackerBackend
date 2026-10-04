@@ -253,7 +253,7 @@ public class OpenGameService {
     }
 
     private OpenGame requireGame(Long id) {
-        return openGameRepository.findByIdOptional(id)
+        return openGameRepository.findActiveById(id)
                 .orElseThrow(() -> new NotFoundException("Game not found"));
     }
 

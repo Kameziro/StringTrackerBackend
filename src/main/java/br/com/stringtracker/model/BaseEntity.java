@@ -9,16 +9,16 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 
 /**
  * Campos comuns a todas as entidades persistidas (soft-delete + auditoria).
- * {@link SQLRestriction} aplica filtro {@code active = true} em todas as queries.
+ * Cada query de repositório filtra {@code active = true} explicitamente: o Hibernate ignora
+ * {@code @SQLRestriction} em {@code @MappedSuperclass}, e na entidade concreta ele quebra
+ * os {@code @ManyToOne} que apontam para linhas excluídas (EntityNotFoundException).
  */
 @MappedSuperclass
-@SQLRestriction("active = true")
 @Getter
 @Setter
 public abstract class BaseEntity {

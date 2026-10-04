@@ -10,12 +10,16 @@ import java.util.Optional;
 @ApplicationScoped
 public class ClubRepository implements PanacheRepository<Club> {
 
+    public Optional<Club> findActiveById(Long id) {
+        return find("active = true and id = ?1", id).firstResultOptional();
+    }
+
     public List<Club> listAllActive() {
-        return list("ORDER BY name ASC");
+        return list("active = true ORDER BY name ASC");
     }
 
     public Optional<Club> findByNameIgnoreCase(String name) {
-        return find("lower(name) = lower(?1)", name.trim()).firstResultOptional();
+        return find("active = true and lower(name) = lower(?1)", name.trim()).firstResultOptional();
     }
 
     /** Cria o clube/lugar se ainda não existir (nome livre do usuário). */

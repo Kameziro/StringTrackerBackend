@@ -110,7 +110,7 @@ public class ProfileService {
             }
             Club club = null;
             if (slotReq.getClubId() != null) {
-                club = clubRepository.findByIdOptional(slotReq.getClubId())
+                club = clubRepository.findActiveById(slotReq.getClubId())
                         .orElseThrow(() -> new NotFoundException("Club not found"));
             }
             AvailabilitySlot slot = AvailabilitySlot.create(
