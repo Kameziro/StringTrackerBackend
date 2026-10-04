@@ -52,6 +52,11 @@ public class BookingRepository implements PanacheRepository<Booking> {
                 .withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
     }
 
+    /** Trava a linha de uma reserva já carregada e relê o estado dela do banco, para não decidir sobre uma leitura velha. */
+    public void reloadForUpdate(Booking booking) {
+        getEntityManager().refresh(booking, LockModeType.PESSIMISTIC_WRITE);
+    }
+
     /** Reserva ativa travada até o fim da transação: é o lock do agregado antes de mexer no pagamento. */
     public Optional<Booking> findActiveForUpdate(long bookingId) {
         return find("id = ?1 and active = true", bookingId)

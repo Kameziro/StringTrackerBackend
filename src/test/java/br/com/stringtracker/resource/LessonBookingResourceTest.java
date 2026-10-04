@@ -18,6 +18,7 @@ import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.PaymentRepository;
+import br.com.stringtracker.service.BookingService;
 import br.com.stringtracker.service.ClockProducer;
 import br.com.stringtracker.support.ScheduleFixtures;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -56,6 +57,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -430,6 +432,86 @@ class LessonBookingResourceTest {
                 .then().statusCode(200)
                 .body("status", equalTo("HELD"))
                 .body("pix", nullValue());
+    }
+
+    private long holdSingles() {
+        return given().contentType(ContentType.JSON).body(hold(slotId, "SINGLES", null))
+                .when().post("/api/lessons/bookings")
+                .then().statusCode(201).extract().jsonPath().getLong("bookingId");
+    }
+
+    private static void clockAt(Instant instant) {
+        QuarkusMock.installMockForType(Clock.fixed(instant, ClockProducer.ZONE), Clock.class);
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void heldBookingPastItsDeadline_isExpiredOnRead_theSameWayTheJobDoesIt() {
+        long bookingId = holdSingles();
+        String orderId = paymentOf(bookingId).getProviderPaymentId();
+        clockAt(NOW.plus(BookingService.HOLD).plusSeconds(1));
+
+        given().when().get("/api/lessons/bookings/" + bookingId)
+                .then().statusCode(200)
+                .body("status", equalTo("EXPIRED"))
+                .body("holdExpiresAt", equalTo("2026-10-05T12:10:00Z"))
+                .body("pix", nullValue());
+
+        verify(mercadoPago).cancel("Bearer club-access-token", "cancel-" + bookingId, orderId);
+        assertEquals(BookingStatus.EXPIRED, bookingsOf(slotId).get(0).status());
+        assertEquals(PaymentStatus.EXPIRED, paymentOf(bookingId).getStatus());
+        // A vaga voltou a ficar livre.
+        given().contentType(ContentType.JSON).body(hold(slotId, "SINGLES", null))
+                .when().post("/api/lessons/bookings").then().statusCode(201);
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void holdOnItsLastInstant_isStillHeldWithItsPix() {
+        long bookingId = holdSingles();
+        clockAt(NOW.plus(BookingService.HOLD));
+
+        given().when().get("/api/lessons/bookings/" + bookingId)
+                .then().statusCode(200)
+                .body("status", equalTo("HELD"))
+                .body("pix.copiaECola", equalTo("copia-e-cola"));
+
+        verify(mercadoPago, never()).cancel(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void expiryOnRead_doesNotDependOnTheProviderAcceptingTheCancellation() {
+        long bookingId = holdSingles();
+        doThrow(new ProcessingException("timeout")).when(mercadoPago).cancel(anyString(), anyString(), anyString());
+        clockAt(NOW.plus(BookingService.HOLD).plusSeconds(1));
+
+        given().when().get("/api/lessons/bookings/" + bookingId)
+                .then().statusCode(200)
+                .body("status", equalTo("EXPIRED"));
+
+        assertEquals(BookingStatus.EXPIRED, bookingsOf(slotId).get(0).status());
+        assertEquals(PaymentStatus.EXPIRED, paymentOf(bookingId).getStatus());
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void paidBookingWhoseHoldDateHasPassed_staysConfirmed() {
+        long bookingId = holdSingles();
+        QuarkusTransaction.requiringNew().run(() ->
+                bookingRepository.findById(bookingId).setStatus(BookingStatus.CONFIRMED));
+        clockAt(NOW.plus(Duration.ofHours(1)));
+
+        given().when().get("/api/lessons/bookings/" + bookingId)
+                .then().statusCode(200)
+                .body("status", equalTo("CONFIRMED"))
+                .body("pix", nullValue());
+
+        verify(mercadoPago, never()).cancel(anyString(), anyString(), anyString());
     }
 
     @Test

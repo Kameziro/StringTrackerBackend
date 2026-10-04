@@ -107,11 +107,18 @@ public class BookingService {
     /** Expira o hold vencido (BOOK-03). O relógio do hold é o da API. */
     @Transactional
     public void expireHold(long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
-        if (booking.getStatus() != BookingStatus.HELD || !booking.getHoldExpiresAt().isBefore(clock.instant())) {
-            return;
+        expireIfOverdue(bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE));
+    }
+
+    /** Quem chama já travou a reserva e leu o estado depois do lock. */
+    private void expireIfOverdue(Booking booking) {
+        if (isHoldOverdue(booking)) {
+            releaseHold(booking, BookingStatus.EXPIRED);
         }
-        releaseHold(booking, BookingStatus.EXPIRED);
+    }
+
+    private boolean isHoldOverdue(Booking booking) {
+        return booking.getStatus() == BookingStatus.HELD && booking.getHoldExpiresAt().isBefore(clock.instant());
     }
 
     /**
@@ -141,13 +148,20 @@ public class BookingService {
 
     /**
      * A reserva só é visível ao aluno que a fez; para os demais ela não existe. Enquanto está HELD, traz o Pix
-     * guardado na criação, sem consultar o provedor.
+     * guardado na criação, sem consultar o provedor. Um hold já vencido é expirado aqui mesmo, pelo caminho do job
+     * (lock, pagamento, cancelamento do Pix): assim o status devolvido é o gravado, e um pagamento que chegue depois
+     * é reembolsado em vez de confirmar uma reserva que o app já mostrou como expirada.
      */
     @Transactional
     public BookingResponse get(long bookingId) {
         User student = currentUserService.requireCurrentUser();
         Booking booking = bookingRepository.findByIdAndStudent(bookingId, student.getId())
                 .orElseThrow(() -> new NotFoundException("Reserva não encontrada"));
+        if (isHoldOverdue(booking)) {
+            // Relê já travada: o webhook pode ter confirmado a reserva depois da leitura sem lock.
+            bookingRepository.reloadForUpdate(booking);
+            expireIfOverdue(booking);
+        }
         return BookingResponse.from(booking, booking.getStatus() == BookingStatus.HELD ? heldPix(booking) : null);
     }
 
