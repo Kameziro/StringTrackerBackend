@@ -3,9 +3,11 @@ package br.com.stringtracker.resource.admin;
 import br.com.stringtracker.dto.ClubProfileResponse;
 import br.com.stringtracker.dto.ConnectUrlResponse;
 import br.com.stringtracker.dto.InviteRequest;
+import br.com.stringtracker.dto.StudentSummaryResponse;
 import br.com.stringtracker.dto.UpdateClubProfileRequest;
 import br.com.stringtracker.service.ClubAdminService;
 import br.com.stringtracker.service.PaymentAccountService;
+import br.com.stringtracker.service.StudentSearchService;
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -17,10 +19,13 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
+
+import java.util.List;
 
 @Path("/api/admin/clubs/{clubId}")
 @Authenticated
@@ -33,6 +38,9 @@ public class ClubAdminResource {
 
     @Inject
     PaymentAccountService paymentAccountService;
+
+    @Inject
+    StudentSearchService studentSearchService;
 
     @GET
     @Path("/profile")
@@ -47,6 +55,12 @@ public class ClubAdminResource {
             @Valid UpdateClubProfileRequest request
     ) {
         return clubAdminService.updateProfile(clubId, request);
+    }
+
+    @GET
+    @Path("/students")
+    public List<StudentSummaryResponse> searchStudents(@PathParam("clubId") long clubId, @QueryParam("q") String q) {
+        return studentSearchService.searchForClub(clubId, q);
     }
 
     @GET

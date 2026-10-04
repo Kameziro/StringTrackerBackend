@@ -19,16 +19,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /** Perfil, imagens e convites do clube. Todo método exige ser admin do clube pedido. */
 @ApplicationScoped
 public class ClubAdminService {
 
     private static final int MAX_PHOTOS = 10;
-    private static final Pattern WHATSAPP_FORMAT = Pattern.compile("^\\+?[\\d\\s().-]+$");
-    private static final int WHATSAPP_MIN_DIGITS = 10;
-    private static final int WHATSAPP_MAX_DIGITS = 15;
 
     @Inject
     ClubAccessService access;
@@ -140,18 +136,7 @@ public class ClubAdminService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** Guarda só os dígitos, o formato que o link wa.me aceita. */
     private static String normalizeWhatsapp(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String trimmed = raw.trim();
-        String digits = trimmed.replaceAll("\\D", "");
-        if (!WHATSAPP_FORMAT.matcher(trimmed).matches()
-                || digits.length() < WHATSAPP_MIN_DIGITS
-                || digits.length() > WHATSAPP_MAX_DIGITS) {
-            throw new BadRequestException("WhatsApp inválido");
-        }
-        return digits;
+        return raw == null || raw.isBlank() ? null : PhoneNumber.digitsOf(raw, "WhatsApp inválido");
     }
 }

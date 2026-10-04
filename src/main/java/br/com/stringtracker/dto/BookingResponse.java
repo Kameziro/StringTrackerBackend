@@ -3,6 +3,7 @@ package br.com.stringtracker.dto;
 import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonType;
+import br.com.stringtracker.model.schedule.PaymentMode;
 import br.com.stringtracker.model.schedule.RefundStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -19,6 +20,7 @@ public record BookingResponse(
         BookingStatus status,
         LessonType lessonType,
         long priceCents,
+        PaymentMode paymentMode,
         String partnerName,
         Instant startsAt,
         Instant endsAt,
@@ -34,7 +36,7 @@ public record BookingResponse(
 
     public static BookingResponse from(Booking booking, Pix pix) {
         return new BookingResponse(booking.getId(), booking.getStatus(), booking.getLessonType(),
-                booking.getPriceCents(), booking.getPartnerName(), booking.getLessonSlot().getStartsAt(),
+                booking.getPriceCents(), booking.getPaymentMode(), booking.getPartnerName(), booking.getLessonSlot().getStartsAt(),
                 booking.getLessonSlot().getEndsAt(), booking.getHoldExpiresAt(), booking.getCancelledAt(),
                 booking.getRefundStatus(), booking.getRefundAmountCents(), pix);
     }
