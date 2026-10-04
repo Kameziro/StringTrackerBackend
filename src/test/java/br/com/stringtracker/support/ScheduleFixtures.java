@@ -10,6 +10,7 @@ import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonKind;
 import br.com.stringtracker.model.schedule.LessonSlot;
+import br.com.stringtracker.model.schedule.LessonSlotStatus;
 import br.com.stringtracker.model.schedule.LessonType;
 import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
@@ -98,11 +99,24 @@ public class ScheduleFixtures {
 
     /** Professor que oferece singles e duplas, com um usuário novo. */
     public Coach coach() {
-        Coach coach = Coach.create(user("kc-fixture-coach-" + UUID.randomUUID()));
+        return coach(user("kc-fixture-coach-" + UUID.randomUUID()));
+    }
+
+    /**
+     * O professor desse usuário (singles e duplas), criado se ainda não existir. O perfil é um só por usuário,
+     * então um professor reaproveitado entre testes chega com a agenda dos testes anteriores removida:
+     * o banco não aceita dois horários sobrepostos do mesmo professor.
+     */
+    public Coach coach(User user) {
+        Coach coach = coachRepository.findByUserId(user.getId()).orElseGet(() -> {
+            Coach created = Coach.create(user);
+            coachRepository.persist(created);
+            return created;
+        });
         coach.setOffersSingles(true);
         coach.setOffersDoubles(true);
         coach.setOffersGroup(false);
-        coachRepository.persist(coach);
+        lessonSlotRepository.update("status = ?1 where coach.id = ?2", LessonSlotStatus.REMOVED, coach.getId());
         return coach;
     }
 
