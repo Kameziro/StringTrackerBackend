@@ -10,7 +10,7 @@ import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestForm;
 
-/** Troca do {@code code} OAuth por tokens da conta do clube no Mercado Pago (formato do spike T1). */
+/** Troca do {@code code} OAuth, e renovação do token, da conta do clube no Mercado Pago (formato do spike T1). */
 @RegisterRestClient(configKey = "mercadopago")
 @Path("/oauth/token")
 public interface MercadoPagoOAuthClient {
@@ -24,6 +24,16 @@ public interface MercadoPagoOAuthClient {
             @RestForm("client_secret") String clientSecret,
             @RestForm("code") String code,
             @RestForm("redirect_uri") String redirectUri
+    );
+
+    @POST
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    TokenResponse refreshToken(
+            @RestForm("grant_type") String grantType,
+            @RestForm("client_id") String clientId,
+            @RestForm("client_secret") String clientSecret,
+            @RestForm("refresh_token") String refreshToken
     );
 
     @JsonIgnoreProperties(ignoreUnknown = true)
