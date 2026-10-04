@@ -17,8 +17,23 @@ public class PaymentRepository implements PanacheRepository<Payment> {
         return find("booking.id = ?1 and active = true", bookingId).firstResultOptional();
     }
 
-    public Optional<Payment> findByProviderPaymentId(String providerPaymentId) {
-        return find("providerPaymentId = ?1 and active = true", providerPaymentId).firstResultOptional();
+    /**
+     * Reserva dona do pagamento. Devolve só o id: quem muda o pagamento trava primeiro a linha da reserva
+     * (ela é o lock do agregado) e só então carrega o pagamento, para não ler um estado já ultrapassado.
+     */
+    public Optional<Long> findBookingIdByProviderPaymentId(String providerPaymentId) {
+        return getEntityManager().createQuery(
+                        "select p.booking.id from Payment p where p.providerPaymentId = :id and p.active = true",
+                        Long.class)
+                .setParameter("id", providerPaymentId)
+                .getResultStream().findFirst();
+    }
+
+    public Optional<Long> findBookingIdByPaymentId(long paymentId) {
+        return getEntityManager().createQuery(
+                        "select p.booking.id from Payment p where p.id = :id and p.active = true", Long.class)
+                .setParameter("id", paymentId)
+                .getResultStream().findFirst();
     }
 
     /** Ids dos pagamentos com reembolso pendente cuja próxima tentativa já venceu. */

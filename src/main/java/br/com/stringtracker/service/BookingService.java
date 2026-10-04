@@ -11,11 +11,14 @@ import br.com.stringtracker.model.schedule.LessonSlotStatus;
 import br.com.stringtracker.model.schedule.LessonType;
 import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
+import br.com.stringtracker.model.schedule.PaymentStatus;
+import br.com.stringtracker.model.schedule.RefundStatus;
 import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
 import br.com.stringtracker.repository.PaymentRepository;
 import br.com.stringtracker.service.payment.PaymentGateway;
 import br.com.stringtracker.service.payment.PaymentGateway.PixCharge;
+import br.com.stringtracker.service.payment.RefundService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.LockModeType;
@@ -58,6 +61,9 @@ public class BookingService {
 
     @Inject
     PaymentGateway gateway;
+
+    @Inject
+    RefundService refundService;
 
     @Inject
     Clock clock;
@@ -103,6 +109,57 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndStudent(bookingId, student.getId())
                 .orElseThrow(() -> new NotFoundException("Reserva não encontrada"));
         return BookingResponse.from(booking, null);
+    }
+
+    /**
+     * Aplica à reserva o estado do pagamento lido no provedor. Quem chama já travou a reserva
+     * e passa um pagamento carregado depois do lock. Repetir o mesmo estado não muda nada.
+     */
+    public void applyPaymentStatus(Payment payment, PaymentStatus remote) {
+        switch (remote) {
+            case APPROVED -> approve(payment);
+            case EXPIRED -> expireUnpaid(payment);
+            case REFUNDED -> markRefunded(payment);
+            case PENDING -> {
+            }
+        }
+    }
+
+    // Pago a tempo: confirma. Pago depois que o horário foi liberado (BOOK-04): reembolso integral.
+    private void approve(Payment payment) {
+        if (payment.getStatus() == PaymentStatus.APPROVED || payment.getStatus() == PaymentStatus.REFUNDED) {
+            return;
+        }
+        Booking booking = payment.getBooking();
+        payment.setStatus(PaymentStatus.APPROVED);
+        if (booking.getStatus() == BookingStatus.HELD) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+        } else {
+            refundService.requestRefund(booking);
+        }
+    }
+
+    private void expireUnpaid(Payment payment) {
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+        payment.setStatus(PaymentStatus.EXPIRED);
+        if (payment.getBooking().getStatus() == BookingStatus.HELD) {
+            payment.getBooking().setStatus(BookingStatus.EXPIRED);
+        }
+    }
+
+    private void markRefunded(Payment payment) {
+        if (payment.getStatus() == PaymentStatus.REFUNDED) {
+            return;
+        }
+        Booking booking = payment.getBooking();
+        payment.setStatus(PaymentStatus.REFUNDED);
+        payment.setNextRefundAt(null);
+        booking.setRefundStatus(RefundStatus.DONE);
+        if (booking.getRefundAmountCents() == null) {
+            booking.setRefundAmountCents(payment.getAmountCents());
+        }
     }
 
     private LessonSlot requireBookableSlot(long slotId) {

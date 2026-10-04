@@ -5,6 +5,7 @@ import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
 import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.model.schedule.RefundStatus;
+import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.PaymentRepository;
 import br.com.stringtracker.service.BusinessRuleException;
 import br.com.stringtracker.service.PaymentProviderException;
@@ -32,6 +33,9 @@ public class RefundService {
     public static final int MAX_ATTEMPTS = 1 + (int) (Duration.ofHours(24).dividedBy(RETRY_INTERVAL));
 
     private static final Logger LOG = Logger.getLogger(RefundService.class);
+
+    @Inject
+    BookingRepository bookingRepository;
 
     @Inject
     PaymentRepository paymentRepository;
@@ -62,10 +66,12 @@ public class RefundService {
     /** Nova tentativa de um reembolso pendente; ignora o que já foi resolvido por outra via. */
     @Transactional
     public void retry(long paymentId) {
-        Payment payment = paymentRepository.findById(paymentId, LockModeType.PESSIMISTIC_WRITE);
-        if (payment.getBooking().getRefundStatus() == RefundStatus.PENDING) {
-            attempt(payment.getBooking(), payment);
-        }
+        paymentRepository.findBookingIdByPaymentId(paymentId).ifPresent(bookingId -> {
+            Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
+            if (booking.getRefundStatus() == RefundStatus.PENDING) {
+                attempt(booking, paymentRepository.findByBookingId(bookingId).orElseThrow());
+            }
+        });
     }
 
     private void attempt(Booking booking, Payment payment) {
