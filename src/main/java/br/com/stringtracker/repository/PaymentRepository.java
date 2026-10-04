@@ -1,13 +1,17 @@
 package br.com.stringtracker.repository;
 
 import br.com.stringtracker.model.schedule.Payment;
+import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.model.schedule.RefundStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class PaymentRepository implements PanacheRepository<Payment> {
@@ -27,6 +31,19 @@ public class PaymentRepository implements PanacheRepository<Payment> {
                         Long.class)
                 .setParameter("id", providerPaymentId)
                 .getResultStream().findFirst();
+    }
+
+    /** Estado do pagamento de cada reserva dada, por id da reserva; reserva sem pagamento (paga por fora) não aparece. */
+    public Map<Long, PaymentStatus> statusByBookingId(Collection<Long> bookingIds) {
+        if (bookingIds.isEmpty()) {
+            return Map.of();
+        }
+        return getEntityManager().createQuery(
+                        "select p.booking.id, p.status from Payment p where p.booking.id in :ids and p.active = true",
+                        Object[].class)
+                .setParameter("ids", bookingIds)
+                .getResultStream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (PaymentStatus) row[1]));
     }
 
     public Optional<Long> findBookingIdByPaymentId(long paymentId) {

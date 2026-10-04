@@ -84,6 +84,21 @@ public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
         getEntityManager().lock(coach, LockModeType.PESSIMISTIC_WRITE);
     }
 
+    /** Horários do professor, em todos os clubes, que começam entre {@code from} (inclusive) e {@code until} (exclusivo), sem os removidos. */
+    public List<LessonSlot> listOfCoach(long coachId, Instant from, Instant until) {
+        return getEntityManager().createQuery("""
+                        select s from LessonSlot s join fetch s.clubCoach cc join fetch cc.club
+                        where s.coach.id = :coachId and s.startsAt >= :from and s.startsAt < :until
+                          and s.status <> :removed and s.active = true
+                        order by s.startsAt, s.id
+                        """, LessonSlot.class)
+                .setParameter("coachId", coachId)
+                .setParameter("from", from)
+                .setParameter("until", until)
+                .setParameter("removed", LessonSlotStatus.REMOVED)
+                .getResultList();
+    }
+
     /** Horários do clube que começam entre {@code from} (inclusive) e {@code until} (exclusivo), sem os removidos. */
     public List<LessonSlot> listOfClub(long clubId, Instant from, Instant until) {
         return list("""
