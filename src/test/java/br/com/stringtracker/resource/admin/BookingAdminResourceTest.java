@@ -4,7 +4,6 @@ import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubCoach;
 import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.BookingStatus;
-import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.model.schedule.RefundStatus;
 import br.com.stringtracker.repository.BookingRepository;
