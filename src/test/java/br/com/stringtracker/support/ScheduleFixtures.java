@@ -11,13 +11,16 @@ import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonKind;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.LessonType;
+import br.com.stringtracker.model.schedule.Payment;
 import br.com.stringtracker.model.schedule.PaymentMode;
+import br.com.stringtracker.model.schedule.PaymentStatus;
 import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.ClubAdminRepository;
 import br.com.stringtracker.repository.ClubCoachRepository;
 import br.com.stringtracker.repository.ClubRepository;
 import br.com.stringtracker.repository.CoachRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
+import br.com.stringtracker.repository.PaymentRepository;
 import br.com.stringtracker.repository.UserRepository;
 import br.com.stringtracker.service.payment.TokenCipher;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -57,6 +60,9 @@ public class ScheduleFixtures {
 
     @Inject
     BookingRepository bookingRepository;
+
+    @Inject
+    PaymentRepository paymentRepository;
 
     /** O usuário com esse id do Keycloak, criado se ainda não existir. */
     public User user(String keycloakId) {
@@ -114,6 +120,22 @@ public class ScheduleFixtures {
                 (short) 1);
         lessonSlotRepository.persist(slot);
         return slot;
+    }
+
+    /** Reserva Pix de singles (R$ 90) na vaga 1 do horário, com o pagamento no estado dado. */
+    public Booking pixBooking(LessonSlot slot, User student, BookingStatus status, PaymentStatus paymentStatus,
+                              String providerOrderId) {
+        Booking booking = Booking.create(slot, (short) 1, LessonType.SINGLES, 9000L, PaymentMode.PIX, status, student);
+        booking.setStudentUser(student);
+        if (status == BookingStatus.HELD) {
+            booking.setHoldExpiresAt(slot.getStartsAt().minusSeconds(3600));
+        }
+        bookingRepository.persist(booking);
+        Payment payment = Payment.create(booking, "MERCADOPAGO", 9000L, slot.getStartsAt());
+        payment.setProviderPaymentId(providerOrderId);
+        payment.setStatus(paymentStatus);
+        paymentRepository.persist(payment);
+        return booking;
     }
 
     /** Reserva de um aluno com conta na vaga 1 do horário, paga por fora. */
