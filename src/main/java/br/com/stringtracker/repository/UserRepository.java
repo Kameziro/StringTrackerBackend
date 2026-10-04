@@ -10,10 +10,12 @@ import java.util.Optional;
 @ApplicationScoped
 public class UserRepository implements PanacheRepository<User> {
 
+    /** Inclui contas desativadas: o keycloak_id continua reservado a elas. */
     public Optional<User> findByKeycloakId(String keycloakId) {
         return find("keycloakId", keycloakId).firstResultOptional();
     }
 
+    /** Inclui contas desativadas: o e-mail continua reservado a elas. */
     public Optional<User> findByEmail(String email) {
         return find("email", email).firstResultOptional();
     }

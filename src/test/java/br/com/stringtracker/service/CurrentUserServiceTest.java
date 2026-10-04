@@ -2,17 +2,20 @@ package br.com.stringtracker.service;
 
 import br.com.stringtracker.model.User;
 import br.com.stringtracker.repository.UserRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.quarkus.test.security.jwt.Claim;
 import io.quarkus.test.security.jwt.JwtSecurity;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.ForbiddenException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
@@ -57,5 +60,19 @@ class CurrentUserServiceTest {
 
         assertEquals(first.getId(), second.getId());
         assertEquals(1, userRepository.count("keycloakId", "kc-jit-2"));
+    }
+
+    @Test
+    @TestSecurity(user = "kc-deactivated")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "kc-deactivated"),
+            @Claim(key = "email", value = "deactivated@example.com"),
+            @Claim(key = "name", value = "Deactivated")
+    })
+    void requireCurrentUser_rejectsDeactivatedUserWithoutRecreatingIt() {
+        QuarkusTransaction.requiringNew().run(() -> currentUserService.requireCurrentUser().markExcluded());
+
+        assertThrows(ForbiddenException.class, () -> currentUserService.requireCurrentUser());
+        assertEquals(1, userRepository.count("keycloakId", "kc-deactivated"));
     }
 }
