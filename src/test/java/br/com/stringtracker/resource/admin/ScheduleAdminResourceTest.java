@@ -5,14 +5,21 @@ import br.com.stringtracker.model.ClubAdmin;
 import br.com.stringtracker.model.ClubCoach;
 import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.model.User;
+import br.com.stringtracker.model.schedule.Booking;
+import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonKind;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.LessonSlotStatus;
+import br.com.stringtracker.model.schedule.LessonType;
+import br.com.stringtracker.model.schedule.PaymentMode;
+import br.com.stringtracker.model.schedule.ScheduleBlock;
+import br.com.stringtracker.repository.BookingRepository;
 import br.com.stringtracker.repository.ClubAdminRepository;
 import br.com.stringtracker.repository.ClubCoachRepository;
 import br.com.stringtracker.repository.ClubRepository;
 import br.com.stringtracker.repository.CoachRepository;
 import br.com.stringtracker.repository.LessonSlotRepository;
+import br.com.stringtracker.repository.ScheduleBlockRepository;
 import br.com.stringtracker.repository.UserRepository;
 import br.com.stringtracker.service.ClockProducer;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -44,6 +51,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
@@ -74,6 +82,12 @@ class ScheduleAdminResourceTest {
 
     @Inject
     LessonSlotRepository lessonSlotRepository;
+
+    @Inject
+    ScheduleBlockRepository scheduleBlockRepository;
+
+    @Inject
+    BookingRepository bookingRepository;
 
     private long clubAId;
     private long clubBId;
@@ -361,5 +375,139 @@ class ScheduleAdminResourceTest {
         }
 
         assertEquals(0, slotsOf(coachId).size());
+    }
+
+    private static String blockUrl(long clubId, long blockId) {
+        return "/api/admin/clubs/%d/blocks/%d".formatted(clubId, blockId);
+    }
+
+    /** Cria o bloco de terça 18h-21h (12 horários) pela API e devolve o id dele. */
+    private long createTuesdayBlock(long clubId) {
+        return given().contentType(ContentType.JSON).body(block(2, "18:00", "21:00", 60))
+                .when().post(blocksUrl(clubId, coachId))
+                .then().statusCode(201)
+                .extract().jsonPath().getLong("id");
+    }
+
+    private void book(LessonSlot slot, BookingStatus status) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            Booking booking = Booking.create(lessonSlotRepository.findById(slot.getId()), (short) 1,
+                    LessonType.SINGLES, 10000L, PaymentMode.OFFLINE, status, user(ADMIN));
+            booking.setGuestName("Aluno");
+            bookingRepository.persist(booking);
+        });
+    }
+
+    // Leitura em transação nova: a sessão do teste guarda entidades já carregadas e devolveria o estado antigo.
+    private LessonSlotStatus slotStatus(long slotId) {
+        return QuarkusTransaction.requiringNew().call(() -> lessonSlotRepository.findById(slotId).getStatus());
+    }
+
+    private boolean blockIsActive(long blockId) {
+        return QuarkusTransaction.requiringNew().call(() -> scheduleBlockRepository.findById(blockId).isActive());
+    }
+
+    private LessonSlotStatus statusOf(LessonSlot slot) {
+        return slotStatus(slot.getId());
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void removingABlock_removesItsFreeFutureSlots_andFreesTheHoursForANewBlock() {
+        long blockId = createTuesdayBlock(clubAId);
+
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(204);
+
+        assertEquals(12, lessonSlotRepository.count("coach.id = ?1 and status = ?2", coachId, LessonSlotStatus.REMOVED));
+        assertEquals(0, lessonSlotRepository.count("coach.id = ?1 and status <> ?2", coachId, LessonSlotStatus.REMOVED));
+        assertFalse(blockIsActive(blockId));
+        // Os horários removidos deixam de bloquear o professor em qualquer clube.
+        given().contentType(ContentType.JSON).body(block(2, "18:00", "21:00", 60))
+                .when().post(blocksUrl(clubBId, coachId))
+                .then().statusCode(201)
+                .body("slotsCreated", equalTo(12));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void removingABlock_keepsSlotsWithActiveBookings_andRemovesTheRest() {
+        long blockId = createTuesdayBlock(clubAId);
+        List<LessonSlot> slots = slotsOf(coachId);
+        LessonSlot confirmed = slots.get(0);
+        LessonSlot held = slots.get(1);
+        LessonSlot cancelled = slots.get(2);
+        LessonSlot expired = slots.get(3);
+        book(confirmed, BookingStatus.CONFIRMED);
+        book(held, BookingStatus.HELD);
+        book(cancelled, BookingStatus.CANCELLED);
+        book(expired, BookingStatus.EXPIRED);
+
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(204);
+
+        assertEquals(LessonSlotStatus.OPEN, statusOf(confirmed));
+        assertEquals(LessonSlotStatus.OPEN, statusOf(held));
+        assertEquals(LessonSlotStatus.REMOVED, statusOf(cancelled));
+        assertEquals(LessonSlotStatus.REMOVED, statusOf(expired));
+        assertEquals(2, lessonSlotRepository.count("coach.id = ?1 and status <> ?2", coachId, LessonSlotStatus.REMOVED));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void removingABlock_leavesSlotsThatAlreadyStarted() {
+        long blockId = createTuesdayBlock(clubAId);
+        long pastId = QuarkusTransaction.requiringNew().call(() -> {
+            ScheduleBlock block = scheduleBlockRepository.findById(blockId);
+            LessonSlot past = LessonSlot.create(block, block.getClubCoach(), NOW.minusSeconds(86400),
+                    NOW.minusSeconds(86400 - 3600), LessonKind.PRIVATE, (short) 1);
+            lessonSlotRepository.persist(past);
+            return past.getId();
+        });
+
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(204);
+
+        assertEquals(LessonSlotStatus.OPEN, slotStatus(pastId));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void blockOfAnotherClub_returns403_unknownBlockReturns404_andNothingIsRemoved() {
+        long blockInB = createTuesdayBlock(clubBId);
+
+        given().when().delete(blockUrl(clubAId, blockInB)).then().statusCode(403);
+        given().when().delete(blockUrl(clubAId, 999999999L)).then().statusCode(404);
+
+        assertEquals(12, lessonSlotRepository.count("coach.id = ?1 and status = ?2", coachId, LessonSlotStatus.OPEN));
+        assertTrue(blockIsActive(blockInB));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void removingTheSameBlockTwice_returns404TheSecondTime() {
+        long blockId = createTuesdayBlock(clubAId);
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(204);
+
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = OTHER_ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = OTHER_ADMIN)})
+    void adminOfAnotherClub_cannotRemoveTheBlock_returns403() {
+        long blockId = QuarkusTransaction.requiringNew().call(() -> {
+            ScheduleBlock block = ScheduleBlock.create(
+                        clubCoachRepository.findByClubAndCoach(clubAId, coachId).orElseThrow(), LessonKind.PRIVATE,
+                        (short) 2, LocalTime.of(18, 0), LocalTime.of(19, 0), (short) 60, (short) 1);
+            scheduleBlockRepository.persist(block);
+            return block.getId();
+        });
+
+        given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(403);
+
+        assertTrue(blockIsActive(blockId));
     }
 }

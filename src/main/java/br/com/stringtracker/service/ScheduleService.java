@@ -15,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 
 import java.sql.SQLException;
@@ -69,6 +70,22 @@ public class ScheduleService {
         LocalDate today = LocalDate.now(clock);
         int created = generateSlots(block, today, today.plusDays(WINDOW_DAYS));
         return ScheduleBlockResponse.from(block, created);
+    }
+
+    /**
+     * Desativa o bloco (o job para de estendê-lo) e remove só os horários futuros sem reserva ativa;
+     * os horários com reserva e os já passados continuam como estão.
+     */
+    @Transactional
+    public void removeBlock(long clubId, long blockId) {
+        access.requireClubAdmin(clubId);
+        ScheduleBlock block = scheduleBlockRepository.findActiveById(blockId)
+                .orElseThrow(() -> new NotFoundException("Bloco não encontrado"));
+        if (block.getClubCoach().getClub().getId() != clubId) {
+            throw new ForbiddenException("Este bloco é de outro clube");
+        }
+        block.markExcluded();
+        lessonSlotRepository.removeFutureWithoutBooking(blockId, clock.instant());
     }
 
     /**
