@@ -1,5 +1,6 @@
 package br.com.stringtracker.service;
 
+import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.repository.ClubAdminRepository;
 import br.com.stringtracker.repository.CoachRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,6 +44,12 @@ public class ClubAccessService {
         if (!coachRepository.existsByIdAndUserId(coachId, userId)) {
             throw new ForbiddenException("Você não é este professor");
         }
+    }
+
+    /** Perfil de professor do usuário atual; 403 se ele ainda não aceitou nenhum convite de professor. */
+    public Coach requireCurrentCoach() {
+        return coachRepository.findByUserId(currentUserService.requireCurrentUser().getId())
+                .orElseThrow(() -> new ForbiddenException("Você não é professor"));
     }
 
     public Set<Long> adminClubIds() {
