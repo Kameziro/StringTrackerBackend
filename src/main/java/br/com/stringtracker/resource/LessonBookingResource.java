@@ -2,6 +2,7 @@ package br.com.stringtracker.resource;
 
 import br.com.stringtracker.dto.BookingResponse;
 import br.com.stringtracker.dto.CreateBookingRequest;
+import br.com.stringtracker.service.BookingCancellationService;
 import br.com.stringtracker.service.BookingService;
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
@@ -24,6 +25,9 @@ public class LessonBookingResource {
     @Inject
     BookingService bookingService;
 
+    @Inject
+    BookingCancellationService cancellationService;
+
     @POST
     public Response hold(@Valid CreateBookingRequest request) {
         return Response.status(Response.Status.CREATED).entity(bookingService.hold(request)).build();
@@ -33,5 +37,12 @@ public class LessonBookingResource {
     @Path("/{id}")
     public BookingResponse get(@PathParam("id") long id) {
         return bookingService.get(id);
+    }
+
+    @POST
+    @Path("/{id}/cancel")
+    @Consumes(MediaType.WILDCARD)
+    public BookingResponse cancel(@PathParam("id") long id) {
+        return cancellationService.cancelByStudent(id);
     }
 }

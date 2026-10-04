@@ -105,19 +105,25 @@ public class BookingService {
                 charge.ticketUrl(), booking.getHoldExpiresAt()));
     }
 
-    /**
-     * Expira o hold vencido: a reserva e o pagamento viram EXPIRED, a vaga fica livre para outro aluno e o Pix é
-     * cancelado no provedor. O relógio do hold é o da API; falha no cancelamento não impede a expiração, já que o
-     * Pix também vence sozinho no provedor e um pagamento tardio é reembolsado pelo webhook.
-     */
+    /** Expira o hold vencido (BOOK-03). O relógio do hold é o da API. */
     @Transactional
     public void expireHold(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId, LockModeType.PESSIMISTIC_WRITE);
         if (booking.getStatus() != BookingStatus.HELD || !booking.getHoldExpiresAt().isBefore(clock.instant())) {
             return;
         }
-        booking.setStatus(BookingStatus.EXPIRED);
-        paymentRepository.findByBookingId(bookingId).ifPresent(payment -> {
+        releaseHold(booking, BookingStatus.EXPIRED);
+    }
+
+    /**
+     * Encerra um hold: a reserva vai para {@code finalStatus} (EXPIRED ou CANCELLED), o pagamento vira EXPIRED, a vaga
+     * fica livre para outro aluno e o Pix é cancelado no provedor. Falha no cancelamento não impede o encerramento,
+     * já que o Pix também vence sozinho no provedor e um pagamento tardio é reembolsado pelo webhook.
+     * Quem chama já travou a reserva.
+     */
+    public void releaseHold(Booking booking, BookingStatus finalStatus) {
+        booking.setStatus(finalStatus);
+        paymentRepository.findByBookingId(booking.getId()).ifPresent(payment -> {
             if (payment.getStatus() == PaymentStatus.PENDING) {
                 payment.setStatus(PaymentStatus.EXPIRED);
             }

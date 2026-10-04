@@ -4,6 +4,7 @@ import br.com.stringtracker.model.schedule.Booking;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -42,6 +43,18 @@ public class BookingRepository implements PanacheRepository<Booking> {
     public Optional<Booking> findByIdAndStudent(long bookingId, long studentUserId) {
         return find("id = ?1 and studentUser.id = ?2 and active = true", bookingId, studentUserId)
                 .firstResultOptional();
+    }
+
+    /** Como {@link #findByIdAndStudent}, travando a linha da reserva até o fim da transação. */
+    public Optional<Booking> findByIdAndStudentForUpdate(long bookingId, long studentUserId) {
+        return find("id = ?1 and studentUser.id = ?2 and active = true", bookingId, studentUserId)
+                .withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
+    }
+
+    /** Reserva ativa travada até o fim da transação: é o lock do agregado antes de mexer no pagamento. */
+    public Optional<Booking> findActiveForUpdate(long bookingId) {
+        return find("id = ?1 and active = true", bookingId)
+                .withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
     }
 
     /** Ids das reservas seguradas cujo hold já venceu, as mais antigas primeiro. */
