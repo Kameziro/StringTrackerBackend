@@ -104,6 +104,9 @@ public class ScheduleService {
      * {@link SlotConflictException}.
      */
     private int generateSlots(ScheduleBlock block) {
+        // Serializa quem cria horários do mesmo professor: duas transações inserindo horários conflitantes
+        // ao mesmo tempo se travariam uma à outra no EXCLUDE (deadlock) em vez de uma receber o 409.
+        lessonSlotRepository.lockCoachSchedule(block.getClubCoach().getCoach());
         Instant now = clock.instant();
         LocalDate from = LocalDate.now(clock);
         LocalDate until = from.plusDays(WINDOW_DAYS);

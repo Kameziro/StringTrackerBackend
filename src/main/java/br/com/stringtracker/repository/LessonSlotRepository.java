@@ -1,10 +1,12 @@
 package br.com.stringtracker.repository;
 
+import br.com.stringtracker.model.Coach;
 import br.com.stringtracker.model.schedule.BookingStatus;
 import br.com.stringtracker.model.schedule.LessonSlot;
 import br.com.stringtracker.model.schedule.LessonSlotStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -13,6 +15,11 @@ import java.util.Set;
 
 @ApplicationScoped
 public class LessonSlotRepository implements PanacheRepository<LessonSlot> {
+
+    /** Trava a agenda do professor até o fim da transação; a linha do professor é o lock de todos os clubes dele. */
+    public void lockCoachSchedule(Coach coach) {
+        getEntityManager().lock(coach, LockModeType.PESSIMISTIC_WRITE);
+    }
 
     /** Horários do clube que começam entre {@code from} (inclusive) e {@code until} (exclusivo), sem os removidos. */
     public List<LessonSlot> listOfClub(long clubId, Instant from, Instant until) {
