@@ -96,10 +96,12 @@ public class BookingService {
                 reference);
         Payment payment = Payment.create(booking, PROVIDER, price, booking.getHoldExpiresAt());
         payment.setProviderPaymentId(charge.providerOrderId());
+        payment.setPixCopiaECola(charge.qrCode());
+        payment.setPixQrCodeBase64(charge.qrCodeBase64());
+        payment.setPixTicketUrl(charge.ticketUrl());
         paymentRepository.persist(payment);
 
-        return BookingResponse.from(booking, new BookingResponse.Pix(charge.qrCodeBase64(), charge.qrCode(),
-                charge.ticketUrl(), booking.getHoldExpiresAt()));
+        return BookingResponse.from(booking, BookingResponse.Pix.of(payment));
     }
 
     /** Expira o hold vencido (BOOK-03). O relógio do hold é o da API. */
@@ -137,13 +139,20 @@ public class BookingService {
         }
     }
 
-    /** A reserva só é visível ao aluno que a fez; para os demais ela não existe. */
+    /**
+     * A reserva só é visível ao aluno que a fez; para os demais ela não existe. Enquanto está HELD, traz o Pix
+     * guardado na criação, sem consultar o provedor.
+     */
     @Transactional
     public BookingResponse get(long bookingId) {
         User student = currentUserService.requireCurrentUser();
         Booking booking = bookingRepository.findByIdAndStudent(bookingId, student.getId())
                 .orElseThrow(() -> new NotFoundException("Reserva não encontrada"));
-        return BookingResponse.from(booking, null);
+        return BookingResponse.from(booking, booking.getStatus() == BookingStatus.HELD ? heldPix(booking) : null);
+    }
+
+    private BookingResponse.Pix heldPix(Booking booking) {
+        return paymentRepository.findByBookingId(booking.getId()).map(BookingResponse.Pix::of).orElse(null);
     }
 
     /**

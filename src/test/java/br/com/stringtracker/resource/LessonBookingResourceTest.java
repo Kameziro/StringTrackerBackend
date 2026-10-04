@@ -59,6 +59,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @QuarkusTest
@@ -376,9 +377,59 @@ class LessonBookingResourceTest {
                 .then().statusCode(200)
                 .body("bookingId", equalTo((int) bookingId))
                 .body("status", equalTo("HELD"))
-                .body("holdExpiresAt", notNullValue())
-                .body("pix", nullValue());
+                .body("holdExpiresAt", notNullValue());
         given().when().get("/api/lessons/bookings/999999999").then().statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void heldBooking_returnsTheSamePixAsTheCreation_withoutCallingTheProvider() {
+        var created = given().contentType(ContentType.JSON).body(hold(slotId, "SINGLES", null))
+                .when().post("/api/lessons/bookings")
+                .then().statusCode(201).extract().jsonPath();
+
+        given().when().get("/api/lessons/bookings/" + created.getLong("bookingId"))
+                .then().statusCode(200)
+                .body("pix.copiaECola", equalTo("copia-e-cola"))
+                .body("pix.qrCodeBase64", equalTo("qr-base64"))
+                .body("pix.ticketUrl", equalTo("https://mp/ticket"))
+                .body("pix.expiresAt", equalTo("2026-10-05T12:10:00Z"))
+                .body("pix", equalTo(created.getMap("pix")));
+        verify(mercadoPago, times(1)).createOrder(anyString(), anyString(), any());
+        verifyNoMoreInteractions(mercadoPago);
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void bookingThatIsNoLongerHeld_hasNoPix() {
+        long bookingId = given().contentType(ContentType.JSON).body(hold(slotId, "SINGLES", null))
+                .when().post("/api/lessons/bookings")
+                .then().statusCode(201).extract().jsonPath().getLong("bookingId");
+
+        for (BookingStatus status : new BookingStatus[]{BookingStatus.CONFIRMED, BookingStatus.CANCELLED,
+                BookingStatus.EXPIRED}) {
+            QuarkusTransaction.requiringNew().run(() -> bookingRepository.findById(bookingId).setStatus(status));
+            given().when().get("/api/lessons/bookings/" + bookingId)
+                    .then().statusCode(200)
+                    .body("status", equalTo(status.name()))
+                    .body("pix", nullValue());
+        }
+    }
+
+    @Test
+    @TestSecurity(user = STUDENT)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = STUDENT)})
+    void heldBookingWhosePixWasNotStored_hasNoPix() {
+        long bookingId = QuarkusTransaction.requiringNew().call(() -> fixtures.pixBooking(
+                lessonSlotRepository.findById(slotId), fixtures.user(STUDENT), BookingStatus.HELD,
+                PaymentStatus.PENDING, "ORD-" + UUID.randomUUID()).getId());
+
+        given().when().get("/api/lessons/bookings/" + bookingId)
+                .then().statusCode(200)
+                .body("status", equalTo("HELD"))
+                .body("pix", nullValue());
     }
 
     @Test

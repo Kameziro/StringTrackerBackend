@@ -49,6 +49,16 @@ public class Payment extends BaseEntity {
     @Column(name = "next_refund_at")
     private Instant nextRefundAt;
 
+    /** Código Pix copia e cola, guardado para reabrir a tela de pagamento; nulo nas cobranças anteriores à V15. */
+    @Column(name = "pix_copia_e_cola", columnDefinition = "text")
+    private String pixCopiaECola;
+
+    @Column(name = "pix_qr_code_base64", columnDefinition = "text")
+    private String pixQrCodeBase64;
+
+    @Column(name = "pix_ticket_url", columnDefinition = "text")
+    private String pixTicketUrl;
+
     public static Payment create(Booking booking, String provider, long amountCents, Instant expiresAt) {
         Payment payment = new Payment();
         payment.booking = booking;
