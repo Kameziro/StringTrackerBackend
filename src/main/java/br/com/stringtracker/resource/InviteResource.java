@@ -2,16 +2,20 @@ package br.com.stringtracker.resource;
 
 import br.com.stringtracker.dto.InviteAcceptedResponse;
 import br.com.stringtracker.dto.InviteInfoResponse;
+import br.com.stringtracker.dto.InviteRegisterRequest;
 import br.com.stringtracker.service.InviteService;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 /**
  * Consulta é pública: o token (256 bits) já é a credencial e a tela de aceite precisa mostrar
@@ -36,5 +40,16 @@ public class InviteResource {
     @Authenticated
     public InviteAcceptedResponse accept(@PathParam("token") String token) {
         return inviteService.accept(token);
+    }
+
+    /** Pública como a consulta: o token do convite é a credencial e o e-mail da conta é o do convite. */
+    @POST
+    @Path("/{token}/register")
+    @PermitAll
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response register(@PathParam("token") String token, @Valid InviteRegisterRequest request) {
+        return Response.status(Response.Status.CREATED)
+                .entity(inviteService.registerAndAccept(token, request))
+                .build();
     }
 }

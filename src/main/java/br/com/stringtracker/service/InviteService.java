@@ -2,7 +2,9 @@ package br.com.stringtracker.service;
 
 import br.com.stringtracker.dto.InviteAcceptedResponse;
 import br.com.stringtracker.dto.InviteInfoResponse;
+import br.com.stringtracker.dto.InviteRegisterRequest;
 import br.com.stringtracker.dto.InviteResponse;
+import br.com.stringtracker.dto.LoginResponse;
 import br.com.stringtracker.model.Club;
 import br.com.stringtracker.model.ClubAdmin;
 import br.com.stringtracker.model.ClubCoach;
@@ -64,6 +66,9 @@ public class InviteService {
     CurrentUserService currentUserService;
 
     @Inject
+    AuthService authService;
+
+    @Inject
     Mailer mailer;
 
     @ConfigProperty(name = "invite.club-admin-url-template")
@@ -94,7 +99,29 @@ public class InviteService {
     @Transactional
     public InviteAcceptedResponse accept(String token) {
         User user = currentUserService.requireCurrentUser();
-        Invite invite = requireUsable(orNotFound(inviteRepository.findByTokenHashForUpdate(hash(token))));
+        return complete(lockUsable(token), user);
+    }
+
+    /**
+     * Cadastro e aceite de uma vez, para quem ainda não tem conta. A conta nasce com o e-mail do convite
+     * (nunca um valor do cliente) e o convite é validado e travado antes de qualquer chamada ao Keycloak,
+     * então token inválido não cria conta. O Keycloak fica fora da transação: se o aceite falhar depois
+     * da conta criada lá, repetir com a mesma senha retoma o cadastro, como no cadastro do app.
+     */
+    @Transactional
+    public LoginResponse registerAndAccept(String token, InviteRegisterRequest request) {
+        Invite invite = lockUsable(token);
+        AuthService.Registration registration = authService.registerInvitee(
+                invite.getEmail(), request.password(), request.name(), request.category(), request.cityId());
+        complete(invite, registration.user());
+        return registration.tokens();
+    }
+
+    private Invite lockUsable(String token) {
+        return requireUsable(orNotFound(inviteRepository.findByTokenHashForUpdate(hash(token))));
+    }
+
+    private InviteAcceptedResponse complete(Invite invite, User user) {
         Club club = invite.getClub();
         switch (invite.getKind()) {
             case CLUB_ADMIN -> linkAdmin(club, user);
