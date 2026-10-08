@@ -47,7 +47,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -509,5 +511,74 @@ class ScheduleAdminResourceTest {
         given().when().delete(blockUrl(clubAId, blockId)).then().statusCode(403);
 
         assertTrue(blockIsActive(blockId));
+    }
+
+    private static String clubBlocksUrl(long clubId) {
+        return "/api/admin/clubs/%d/blocks".formatted(clubId);
+    }
+
+    private String coachName(long coach) {
+        return QuarkusTransaction.requiringNew().call(() -> coachRepository.findById(coach).getUser().getName());
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void listingBlocks_returnsTheClubActiveBlocksWithTheCoachName_byDayAndStart() {
+        long tuesday = createTuesdayBlock(clubAId);
+        long monday = given().contentType(ContentType.JSON).body(block(1, "07:00", "08:30", 90))
+                .when().post(blocksUrl(clubAId, coachId))
+                .then().statusCode(201)
+                .extract().jsonPath().getLong("id");
+        given().contentType(ContentType.JSON).body(block(3, "18:00", "19:00", 60))
+                .when().post(blocksUrl(clubBId, coachId))
+                .then().statusCode(201);
+
+        given().when().get(clubBlocksUrl(clubAId))
+                .then().statusCode(200)
+                .body("blocks.id", contains((int) monday, (int) tuesday))
+                .body("blocks[0].coachId", equalTo((int) coachId))
+                .body("blocks[0].coachName", equalTo(coachName(coachId)))
+                .body("blocks[0].dayOfWeek", equalTo(1))
+                .body("blocks[0].startTime", equalTo("07:00:00"))
+                .body("blocks[0].endTime", equalTo("08:30:00"))
+                .body("blocks[0].durationMinutes", equalTo(90))
+                .body("blocks[1].dayOfWeek", equalTo(2))
+                .body("blocks[1].startTime", equalTo("18:00:00"))
+                .body("blocks[1].endTime", equalTo("21:00:00"))
+                .body("blocks[1].durationMinutes", equalTo(60));
+    }
+
+    @Test
+    @TestSecurity(user = ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = ADMIN)})
+    void listingBlocks_leavesOutRemovedBlocksAndBlocksOfUnlinkedCoaches() {
+        long removed = createTuesdayBlock(clubAId);
+        given().when().delete(blockUrl(clubAId, removed)).then().statusCode(204);
+        QuarkusTransaction.requiringNew().run(() -> {
+            ClubCoach link = link(clubRepository.findById(clubAId),
+                    coach(user("kc-sched-coach-" + UUID.randomUUID())), 10000L, null);
+            scheduleBlockRepository.persist(ScheduleBlock.create(link, LessonKind.PRIVATE, (short) 4,
+                    LocalTime.of(8, 0), LocalTime.of(9, 0), (short) 60, (short) 1));
+            link.markExcluded();
+        });
+
+        given().when().get(clubBlocksUrl(clubAId))
+                .then().statusCode(200)
+                .body("blocks", empty());
+    }
+
+    @Test
+    @TestSecurity(user = OTHER_ADMIN)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = OTHER_ADMIN)})
+    void listingBlocks_byTheAdminOfAnotherClub_returns403() {
+        given().when().get(clubBlocksUrl(clubAId)).then().statusCode(403);
+    }
+
+    @Test
+    @TestSecurity(user = COMMON)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = COMMON)})
+    void listingBlocks_byACommonUser_returns403() {
+        given().when().get(clubBlocksUrl(clubAId)).then().statusCode(403);
     }
 }

@@ -1,5 +1,6 @@
 package br.com.stringtracker.service;
 
+import br.com.stringtracker.dto.ClubBlocksResponse;
 import br.com.stringtracker.dto.CreateScheduleBlockRequest;
 import br.com.stringtracker.dto.ScheduleBlockResponse;
 import br.com.stringtracker.model.ClubCoach;
@@ -73,6 +74,14 @@ public class ScheduleService {
                 request.startTime(), request.endTime(), (short) request.durationMinutes(), PRIVATE_CAPACITY);
         scheduleBlockRepository.persist(block);
         return ScheduleBlockResponse.from(block, generateSlots(block));
+    }
+
+    @Transactional
+    public ClubBlocksResponse listBlocks(long clubId) {
+        access.requireClubAdmin(clubId);
+        return new ClubBlocksResponse(scheduleBlockRepository.listActiveOfClub(clubId).stream()
+                .map(ClubBlocksResponse.Block::from)
+                .toList());
     }
 
     /**
