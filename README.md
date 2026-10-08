@@ -148,6 +148,12 @@ Demais rotas exigem `Authorization: Bearer <accessToken>`.
 | `free.player` | `free123` | `user` |
 | `premium.player` | `premium123` | `user`, `premium` |
 
+Criado no banco local (não vem do realm importado; some se o Keycloak ou o Postgres forem recriados):
+
+| E-mail | Senha | Papel |
+|--------|-------|-------|
+| `admin.clube@stringtracker.local` | `admin123` | admin dos clubes Maranhão e Met Pad no painel (onde o `premium.player` é professor) |
+
 ### Login
 
 ```bash
