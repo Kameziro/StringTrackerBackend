@@ -65,7 +65,9 @@ public interface MercadoPagoClient {
     ) {
     }
 
-    record Payer(String email) {
+    /** {@code first_name} só vai no sandbox: "APRO" faz o Mercado Pago aprovar o Pix de teste sozinho. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record Payer(String email, @JsonProperty("first_name") String firstName) {
     }
 
     record Transactions(List<PaymentRequest> payments) {

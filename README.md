@@ -98,6 +98,22 @@ Base URL: `http://localhost:8080`
 
 Dev UI (quando `quarkus:dev` está no ar): `http://localhost:8080/q/dev`.
 
+### Testar o Pix do Mercado Pago em dev
+
+O clube precisa estar conectado (token de teste do Mercado Pago cifrado com a `TOKEN_CIPHER_KEY` da API). Para o Pix de teste ser aprovado e confirmado sem pagar nem expor a API:
+
+1. Suba a API com `MP_SANDBOX_PAYER_FIRST_NAME=APRO`: o pedido vai com `payer.first_name` "APRO" e o sandbox o aprova sozinho em alguns segundos. **Nunca defina em produção.**
+2. Reserve a aula pelo app (a tela do Pix fica aguardando).
+3. Simule o webhook, com a mesma `MP_WEBHOOK_SECRET` da API:
+
+```bash
+MP_WEBHOOK_SECRET=... node scripts/simulate-mp-webhook.mjs --latest
+```
+
+O script assina a notificação como o Mercado Pago e a reenvia enquanto o pagamento local estiver `PENDING` (até 30 s). A API lê o pedido no Mercado Pago, confirma a reserva e o app sai da tela do Pix. Cancelar a aula com 24h ou mais de antecedência faz o reembolso real no sandbox.
+
+A entrega real do webhook (Mercado Pago → API) precisa de uma URL pública (túnel) cadastrada no painel e da chave secreta gerada lá.
+
 ## Variáveis de ambiente
 
 Definidas em [`.env.example`](.env.example):

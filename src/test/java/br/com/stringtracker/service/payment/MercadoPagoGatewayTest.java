@@ -113,6 +113,8 @@ class MercadoPagoGatewayTest {
         assertEquals("booking-7", body.get("external_reference").asText());
         assertEquals("90.00", body.get("total_amount").asText());
         assertEquals("aluno@example.com", body.get("payer").get("email").asText());
+        // Fora do sandbox o pagador vai só com o e-mail: "APRO" aprovaria qualquer Pix de teste.
+        assertFalse(body.get("payer").has("first_name"));
         JsonNode payment = body.get("transactions").get("payments").get(0);
         assertEquals("90.00", payment.get("amount").asText());
         assertEquals("PT10M", payment.get("expiration_time").asText());

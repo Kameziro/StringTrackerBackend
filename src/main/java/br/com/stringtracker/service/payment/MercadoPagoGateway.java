@@ -31,6 +31,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -66,12 +67,16 @@ public class MercadoPagoGateway implements PaymentGateway {
     @ConfigProperty(name = "mp.client-secret")
     String clientSecret;
 
+    /** Só para o sandbox (ex.: "APRO", que aprova o Pix de teste); vazio em produção. */
+    @ConfigProperty(name = "mp.sandbox.payer-first-name")
+    Optional<String> sandboxPayerFirstName;
+
     @Override
     public PixCharge createPix(ClubCredentials credentials, long amountCents, String description, String payerEmail,
                                String externalReference, Duration expiresIn, String idempotencyKey) {
         String amount = reais(amountCents);
         CreateOrderRequest request = new CreateOrderRequest("online", externalReference, "automatic", amount,
-                description, new Payer(payerEmail),
+                description, new Payer(payerEmail, sandboxPayerFirstName.filter(name -> !name.isBlank()).orElse(null)),
                 new Transactions(List.of(new PaymentRequest(amount, new PaymentMethodRequest("pix", "bank_transfer"),
                         expiresIn.toString()))));
         Order order = call("Não foi possível gerar o Pix. Tente novamente",
