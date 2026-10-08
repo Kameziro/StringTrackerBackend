@@ -208,12 +208,14 @@ class OpenGameCancelAndLeaveResourceTest {
     @Test
     @TestSecurity(user = INTERESTED)
     @JwtSecurity(claims = {@Claim(key = "sub", value = INTERESTED)})
-    void interestedPlayerLeaves_isMarkedDeclined_andTheOrganizerIsPushed() {
+    void interestedPlayerLeaves_leavesTheInterestedList_andTheOrganizerIsPushed() {
         long gameId = futureGame();
 
         given().when().post("/api/games/%d/decline".formatted(gameId))
                 .then().statusCode(200)
-                .body("interests.find { it.userId == %d }.status".formatted(userId(INTERESTED)), equalTo("DECLINED"));
+                .body("interests.userId", not(hasItem((int) userId(INTERESTED))))
+                .body("interests.userId", hasItem((int) userId(CONFIRMED)))
+                .body("interestedCount", equalTo(1));
 
         verify(push).notifyUser(eq(userId(ORGANIZER)), eq("Saiu do seu jogo"), eq("Ana Interessada não vai mais jogar"), any());
     }
@@ -230,6 +232,19 @@ class OpenGameCancelAndLeaveResourceTest {
 
         assertEquals(OpenGameStatus.OPEN, statusOf(gameId));
         verify(push).notifyUser(eq(userId(ORGANIZER)), eq("Saiu do seu jogo"), eq("Bruno Confirmado não vai mais jogar"), any());
+    }
+
+    @Test
+    @TestSecurity(user = OUTSIDER)
+    @JwtSecurity(claims = {@Claim(key = "sub", value = OUTSIDER)})
+    void whoDeclinedNeverShowsInTheInterestedList() {
+        long gameId = futureGame();
+
+        given().when().get("/api/games/%d".formatted(gameId))
+                .then().statusCode(200)
+                .body("interests.userId", not(hasItem((int) userId(DECLINED))))
+                .body("interests.status", not(hasItem("DECLINED")))
+                .body("interests.size()", equalTo(2));
     }
 
     @Test
