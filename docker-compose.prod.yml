@@ -91,6 +91,20 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS}
+      # Obrigatórias (a API não sobe sem elas): com `:?`, faltando alguma no .env o compose para antes de trocar
+      # os containers, e a versão no ar continua de pé.
+      TOKEN_CIPHER_KEY: ${TOKEN_CIPHER_KEY:?defina TOKEN_CIPHER_KEY no .env}
+      MP_CLIENT_ID: ${MP_CLIENT_ID:?defina MP_CLIENT_ID no .env}
+      MP_CLIENT_SECRET: ${MP_CLIENT_SECRET:?defina MP_CLIENT_SECRET no .env}
+      MP_REDIRECT_URI: ${MP_REDIRECT_URI:?defina MP_REDIRECT_URI no .env}
+      MP_STATE_KEY: ${MP_STATE_KEY:?defina MP_STATE_KEY no .env}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:?defina MP_WEBHOOK_SECRET no .env}
+      # E-mail dos convites: sem SMTP o envio falha e o painel mostra o link para cópia.
+      MAIL_FROM: ${MAIL_FROM:-no-reply@padel.kameziro.com.br}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
