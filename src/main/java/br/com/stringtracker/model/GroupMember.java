@@ -8,15 +8,12 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "group_members", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_group_members_group_user", columnNames = {"group_id", "user_id"})
-})
+@Table(name = "group_members")
 @Getter
 @Setter
 @NoArgsConstructor

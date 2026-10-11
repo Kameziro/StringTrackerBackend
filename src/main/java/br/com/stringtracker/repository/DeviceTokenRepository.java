@@ -13,17 +13,17 @@ import java.util.Optional;
 public class DeviceTokenRepository implements PanacheRepository<DeviceToken> {
 
     public Optional<DeviceToken> findByToken(String expoPushToken) {
-        return find("expoPushToken", expoPushToken).firstResultOptional();
+        return find("active = true and expoPushToken = ?1", expoPushToken).firstResultOptional();
     }
 
     public List<DeviceToken> findByUser(User user) {
-        return list("user", user);
+        return list("active = true and user = ?1", user);
     }
 
     public List<DeviceToken> findByUserIds(Collection<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return List.of();
         }
-        return list("user.id in ?1", userIds);
+        return list("active = true and user.id in ?1", userIds);
     }
 }

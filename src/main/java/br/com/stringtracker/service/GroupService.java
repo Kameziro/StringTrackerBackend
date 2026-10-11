@@ -181,7 +181,7 @@ public class GroupService {
     }
 
     public PlayerGroup requireGroup(Long id) {
-        return playerGroupRepository.findByIdOptional(id)
+        return playerGroupRepository.findActiveById(id)
                 .orElseThrow(() -> new NotFoundException("Grupo não encontrado"));
     }
 

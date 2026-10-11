@@ -11,7 +11,7 @@ import java.util.List;
 public class AvailabilitySlotRepository implements PanacheRepository<AvailabilitySlot> {
 
     public List<AvailabilitySlot> findByUser(User user) {
-        return list("user", user);
+        return list("active = true and user = ?1", user);
     }
 
     public void deleteByUser(User user) {

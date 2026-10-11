@@ -11,10 +11,12 @@ import java.util.Optional;
 @ApplicationScoped
 public class UserRepository implements PanacheRepository<User> {
 
+    /** Inclui contas desativadas: o keycloak_id continua reservado a elas. */
     public Optional<User> findByKeycloakId(String keycloakId) {
         return find("keycloakId", keycloakId).firstResultOptional();
     }
 
+    /** Inclui contas desativadas: o e-mail continua reservado a elas. */
     public Optional<User> findByEmail(String email) {
         return find("email", email).firstResultOptional();
     }
@@ -32,13 +34,13 @@ public class UserRepository implements PanacheRepository<User> {
 
     public List<User> findAvailableTodayByCategoryAndCity(int category, Long cityId) {
         return list(
-                "category = ?1 and availableToday = true and city.id = ?2 ORDER BY name ASC",
+                "active = true and category = ?1 and availableToday = true and city.id = ?2 ORDER BY name ASC",
                 category,
                 cityId
         );
     }
 
     public List<User> findByCategoryAndCity(int category, Long cityId) {
-        return list("category = ?1 and city.id = ?2", category, cityId);
+        return list("active = true and category = ?1 and city.id = ?2", category, cityId);
     }
 }

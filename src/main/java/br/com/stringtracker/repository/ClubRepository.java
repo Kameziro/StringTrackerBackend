@@ -20,7 +20,7 @@ public class ClubRepository implements PanacheRepository<Club> {
     }
 
     public Optional<Club> findByNameIgnoreCase(String name) {
-        return find("lower(name) = lower(?1)", name.trim()).firstResultOptional();
+        return find("active = true and lower(name) = lower(?1)", name.trim()).firstResultOptional();
     }
 
     /** Cria o clube/lugar se ainda não existir (nome livre do usuário). */

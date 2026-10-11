@@ -13,27 +13,27 @@ import java.util.Optional;
 public class GroupMemberRepository implements PanacheRepository<GroupMember> {
 
     public Optional<GroupMember> findByGroupAndUser(PlayerGroup group, User user) {
-        return find("group = ?1 and user = ?2", group, user).firstResultOptional();
+        return find("active = true and group = ?1 and user = ?2", group, user).firstResultOptional();
     }
 
     public Optional<GroupMember> findByGroupIdAndUserId(Long groupId, Long userId) {
-        return find("group.id = ?1 and user.id = ?2", groupId, userId).firstResultOptional();
+        return find("active = true and group.id = ?1 and user.id = ?2", groupId, userId).firstResultOptional();
     }
 
     public boolean isMember(PlayerGroup group, User user) {
-        return count("group = ?1 and user = ?2", group, user) > 0;
+        return count("active = true and group = ?1 and user = ?2", group, user) > 0;
     }
 
     public List<GroupMember> findByGroup(PlayerGroup group) {
-        return list("group", group);
+        return list("active = true and group = ?1", group);
     }
 
     public List<GroupMember> findByUser(User user) {
-        return list("user", user);
+        return list("active = true and group.active = true and user = ?1", user);
     }
 
     public long countByGroup(PlayerGroup group) {
-        return count("group", group);
+        return count("active = true and group = ?1", group);
     }
 
     public List<Long> findMemberUserIds(PlayerGroup group) {

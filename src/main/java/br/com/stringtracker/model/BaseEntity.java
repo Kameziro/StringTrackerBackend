@@ -14,8 +14,9 @@ import java.time.Instant;
 
 /**
  * Campos comuns a todas as entidades persistidas (soft-delete + auditoria).
- * Nenhuma query filtra {@code active} sozinha (o Hibernate ignora {@code @SQLRestriction} numa
- * {@code @MappedSuperclass}): toda consulta que deve ver só registros ativos escreve {@code active = true}.
+ * Cada query de repositório filtra {@code active = true} explicitamente: o Hibernate ignora
+ * {@code @SQLRestriction} em {@code @MappedSuperclass}, e na entidade concreta ele quebra
+ * os {@code @ManyToOne} que apontam para linhas excluídas (EntityNotFoundException).
  */
 @MappedSuperclass
 @Getter

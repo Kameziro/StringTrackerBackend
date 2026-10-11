@@ -6,15 +6,12 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "device_tokens", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_device_tokens_token", columnNames = "expo_push_token")
-})
+@Table(name = "device_tokens")
 @Getter
 @Setter
 @NoArgsConstructor
