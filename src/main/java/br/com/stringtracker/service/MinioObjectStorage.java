@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @ApplicationScoped
 public class MinioObjectStorage {
@@ -57,6 +58,11 @@ public class MinioObjectStorage {
         public String fileStem() {
             return fileStem;
         }
+    }
+
+    public enum ClubImageKind {
+        LOGO,
+        PHOTO
     }
 
     @ConfigProperty(name = "minio.endpoint")
@@ -101,6 +107,23 @@ public class MinioObjectStorage {
     ) {
         String ext = validateAndExt(contentType, size);
         String objectKey = "groups/" + groupId + "/" + kind.fileStem() + "." + ext;
+        putObject(objectKey, data, size, normalizeContentType(contentType));
+        return MEDIA_PREFIX + objectKey + "?v=" + System.currentTimeMillis();
+    }
+
+    /** O logo tem chave fixa por clube; cada foto da galeria ganha uma chave nova. */
+    public String uploadClubImage(
+            long clubId,
+            ClubImageKind kind,
+            InputStream data,
+            long size,
+            String contentType
+    ) {
+        String ext = validateAndExt(contentType, size);
+        String objectKey = switch (kind) {
+            case LOGO -> "clubs/" + clubId + "/logo." + ext;
+            case PHOTO -> "clubs/" + clubId + "/photos/" + UUID.randomUUID() + "." + ext;
+        };
         putObject(objectKey, data, size, normalizeContentType(contentType));
         return MEDIA_PREFIX + objectKey + "?v=" + System.currentTimeMillis();
     }

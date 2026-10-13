@@ -58,4 +58,10 @@ public abstract class BaseEntity {
         this.active = false;
         this.exclusionDate = Instant.now();
     }
+
+    /** Desfaz o soft-delete. */
+    public void reactivate() {
+        this.active = true;
+        this.exclusionDate = null;
+    }
 }

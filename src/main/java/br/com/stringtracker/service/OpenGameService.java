@@ -21,6 +21,8 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 
+import java.time.Clock;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -45,6 +47,11 @@ public class OpenGameService {
 
     @Inject
     ExpoPushService expoPushService;
+
+    @Inject
+    Clock clock;
+
+    private static final DateTimeFormatter DAY_AND_TIME = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
 
     @Transactional
     public OpenGameResponse create(User organizer, CreateOpenGameRequest request) {
@@ -178,9 +185,22 @@ public class OpenGameService {
         return toResponse(game);
     }
 
+    /**
+     * Recusar um jogo, ou desistir dele depois de ter entrado. Quem desiste avisa o organizador; um confirmado que
+     * sai de um jogo confirmado reabre a vaga (o jogo volta a aberto).
+     */
     @Transactional
     public OpenGameResponse decline(User user, Long gameId) {
         OpenGame game = requireGame(gameId);
+        if (Objects.equals(game.getOrganizer().getId(), user.getId())) {
+            throw new BusinessRuleException("O organizador não sai do próprio jogo: cancele o jogo");
+        }
+        if (game.getStatus() == OpenGameStatus.CANCELLED) {
+            throw new BusinessRuleException("Este jogo foi cancelado");
+        }
+        if (!game.getStartsAt().isAfter(clock.instant())) {
+            throw new BusinessRuleException("O jogo já começou");
+        }
         GameInterest interest = gameInterestRepository.findByGameAndUser(game, user)
                 .orElseGet(() -> {
                     GameInterest created = GameInterest.create(game, user);
@@ -188,9 +208,19 @@ public class OpenGameService {
                     gameInterestRepository.persist(created);
                     return created;
                 });
+        GameInterestStatus before = interest.getStatus();
         interest.setStatus(GameInterestStatus.DECLINED);
-        if (game.getStatus() == OpenGameStatus.FULL) {
+        if (game.getStatus() == OpenGameStatus.FULL
+                || (game.getStatus() == OpenGameStatus.CONFIRMED && before == GameInterestStatus.CONFIRMED)) {
             game.setStatus(OpenGameStatus.OPEN);
+        }
+        if (before == GameInterestStatus.INTERESTED || before == GameInterestStatus.CONFIRMED) {
+            expoPushService.notifyUser(
+                    game.getOrganizer().getId(),
+                    "Saiu do seu jogo",
+                    user.getName() + " não vai mais jogar",
+                    expoPushService.gameData(game.getId())
+            );
         }
         return toResponse(game);
     }
@@ -224,6 +254,39 @@ public class OpenGameService {
                 playerIds,
                 "Jogo confirmado",
                 game.getClub().getName() + " · time fechado",
+                expoPushService.gameData(game.getId())
+        );
+
+        return toResponse(game);
+    }
+
+    /**
+     * O organizador cancela o jogo antes do horário: ele sai da lista de abertos e quem estava interessado ou
+     * confirmado recebe um push. O jogo continua existindo, para o link e o push abrirem "Cancelado".
+     */
+    @Transactional
+    public OpenGameResponse cancel(User organizer, Long gameId) {
+        OpenGame game = requireGame(gameId);
+        if (!Objects.equals(game.getOrganizer().getId(), organizer.getId())) {
+            throw new ForbiddenException("Só o organizador pode cancelar o jogo");
+        }
+        if (game.getStatus() == OpenGameStatus.CANCELLED) {
+            throw new BusinessRuleException("Este jogo já foi cancelado");
+        }
+        if (!game.getStartsAt().isAfter(clock.instant())) {
+            throw new BusinessRuleException("O jogo já começou");
+        }
+        game.setStatus(OpenGameStatus.CANCELLED);
+
+        List<Long> playerIds = gameInterestRepository.findByGame(game).stream()
+                .filter(i -> i.getStatus() == GameInterestStatus.INTERESTED || i.getStatus() == GameInterestStatus.CONFIRMED)
+                .map(i -> i.getUser().getId())
+                .toList();
+        expoPushService.notifyUsers(
+                playerIds,
+                "Jogo cancelado",
+                String.format("%s cancelou o jogo de %s no %s", organizer.getName(),
+                        DAY_AND_TIME.format(game.getStartsAt().atZone(clock.getZone())), game.getClub().getName()),
                 expoPushService.gameData(game.getId())
         );
 

@@ -203,6 +203,10 @@ public class AuthService {
         }
     }
 
+    /** Conta recém-criada (ou retomada): tokens de login e o espelho local, na mesma transação. */
+    public record Registration(LoginResponse tokens, User user) {
+    }
+
     /**
      * Cadastro completo: Keycloak + usuário local com categoria/cidade.
      * Chamado só depois que o app coletou e-mail, nome, senha, perfil e termos.
@@ -215,12 +219,40 @@ public class AuthService {
             Integer category,
             Long cityId
     ) {
+        if (category == null || category < 1 || category > 8) {
+            throw new BadRequestException("Categoria inválida");
+        }
+        return createAccount(email, password, name, category, cityId).tokens();
+    }
+
+    /**
+     * Cadastro do convidado na página do convite do painel: igual ao do app, mas a categoria é
+     * opcional (sem ela o jogador a completa depois, no perfil do app). Só o convite chama isto.
+     */
+    @Transactional
+    public Registration registerInvitee(
+            String email,
+            String password,
+            String name,
+            Integer category,
+            Long cityId
+    ) {
+        if (category != null && (category < 1 || category > 8)) {
+            throw new BadRequestException("Categoria inválida");
+        }
+        return createAccount(email, password, name, category, cityId);
+    }
+
+    private Registration createAccount(
+            String email,
+            String password,
+            String name,
+            Integer category,
+            Long cityId
+    ) {
         String normalizedEmail = email.trim().toLowerCase();
         if (name == null || name.isBlank()) {
             throw new BadRequestException("Nome é obrigatório no cadastro");
-        }
-        if (category == null || category < 1 || category > 8) {
-            throw new BadRequestException("Categoria inválida");
         }
         if (cityId == null) {
             throw new BadRequestException("Cidade é obrigatória no cadastro");
@@ -239,15 +271,15 @@ public class AuthService {
         }
 
         LoginResponse tokens = login(normalizedEmail, password);
-        ensureLocalUser(tokens.getAccessToken(), normalizedEmail, displayName, category, city);
-        return tokens;
+        User user = ensureLocalUser(tokens.getAccessToken(), normalizedEmail, displayName, category, city);
+        return new Registration(tokens, user);
     }
 
     /**
      * Conta no Keycloak sem espelho local: completa perfil e autentica com a senha
      * informada. Se a senha não bater, trata como e-mail já cadastrado (sem reset).
      */
-    private LoginResponse resumeInterruptedRegistration(
+    private Registration resumeInterruptedRegistration(
             String adminToken,
             String email,
             String displayName,
@@ -278,8 +310,8 @@ public class AuthService {
         } catch (InvalidCredentialsException e) {
             throw new UserAlreadyExistsException("Já existe uma conta com este e-mail");
         }
-        ensureLocalUser(tokens.getAccessToken(), email, displayName, category, city);
-        return tokens;
+        User user = ensureLocalUser(tokens.getAccessToken(), email, displayName, category, city);
+        return new Registration(tokens, user);
     }
 
     private void createKeycloakUser(
@@ -386,7 +418,7 @@ public class AuthService {
         }
     }
 
-    private void ensureLocalUser(
+    private User ensureLocalUser(
             String accessToken,
             String email,
             String name,
@@ -402,9 +434,11 @@ public class AuthService {
         if (existing.isPresent()) {
             User user = existing.get();
             user.setName(name);
-            user.setCategory(category);
+            if (category != null) {
+                user.setCategory(category);
+            }
             user.setCity(city);
-            return;
+            return user;
         }
         User user = new User();
         user.setKeycloakId(keycloakId);
@@ -414,6 +448,7 @@ public class AuthService {
         user.setCity(city);
         userRepository.persist(user);
         LOG.infof("Local user created id=%s email=%s", keycloakId, email);
+        return user;
     }
 
     private String fetchAdminToken() {

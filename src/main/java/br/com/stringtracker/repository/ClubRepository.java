@@ -10,12 +10,13 @@ import java.util.Optional;
 @ApplicationScoped
 public class ClubRepository implements PanacheRepository<Club> {
 
-    public Optional<Club> findActiveById(Long id) {
-        return find("active = true and id = ?1", id).firstResultOptional();
-    }
-
     public List<Club> listAllActive() {
         return list("active = true ORDER BY name ASC");
+    }
+
+    // O filtro `active` é explícito: @SQLRestriction na BaseEntity (@MappedSuperclass) não é aplicado pelo Hibernate.
+    public Optional<Club> findActiveById(long id) {
+        return find("id = ?1 and active = true", id).firstResultOptional();
     }
 
     public Optional<Club> findByNameIgnoreCase(String name) {

@@ -49,4 +49,8 @@ public class User extends BaseEntity {
     /** URL pública da foto no MinIO (bucket de avatars). */
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;
+
+    /** Administrador da plataforma (cadastra clubes). Definido direto no banco. */
+    @Column(name = "platform_admin", nullable = false)
+    private boolean platformAdmin;
 }

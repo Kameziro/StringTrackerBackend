@@ -49,8 +49,10 @@ public class OpenGameResponse {
         }
     }
 
+    /** Quem recusou ou saiu do jogo não aparece: a lista mostra só quem está (interessado ou confirmado). */
     public static OpenGameResponse from(OpenGame game, List<GameInterest> interests) {
         List<InterestResponse> interestResponses = interests.stream()
+                .filter(i -> i.getStatus() != GameInterestStatus.DECLINED)
                 .map(InterestResponse::from)
                 .toList();
         long interested = interests.stream()

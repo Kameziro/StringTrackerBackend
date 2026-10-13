@@ -61,8 +61,16 @@ public class OpenGameResource {
 
     @POST
     @Path("/{id}/decline")
+    @Consumes(MediaType.WILDCARD)
     public OpenGameResponse decline(@PathParam("id") Long id) {
         return openGameService.decline(currentUserService.requireCurrentUser(), id);
+    }
+
+    @POST
+    @Path("/{id}/cancel")
+    @Consumes(MediaType.WILDCARD)
+    public OpenGameResponse cancel(@PathParam("id") Long id) {
+        return openGameService.cancel(currentUserService.requireCurrentUser(), id);
     }
 
     @POST
